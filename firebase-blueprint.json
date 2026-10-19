@@ -59,6 +59,8 @@
         "status": { "type": "string" },
         "city": { "type": "string" },
         "isFeatured": { "type": "boolean" },
+        "imageUrl": { "type": "string" },
+        "viewsCount": { "type": "integer" },
         "phoneNumber": { "type": "string" },
         "whatsappNumber": { "type": "string" },
         "createdAt": { "type": "string", "format": "date-time" },

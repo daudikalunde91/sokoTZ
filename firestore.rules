@@ -61,6 +61,8 @@ service cloud.firestore {
              (!('status' in data) || (data.status is string && data.status.size() <= 50)) &&
              (!('city' in data) || (data.city is string && data.city.size() <= 100)) &&
              (!('isFeatured' in data) || data.isFeatured is bool) &&
+             (!('imageUrl' in data) || (data.imageUrl is string && data.imageUrl.size() <= 250000)) &&
+             (!('viewsCount' in data) || data.viewsCount is int) &&
              (!('phoneNumber' in data) || (data.phoneNumber is string && data.phoneNumber.size() <= 50)) &&
              (!('whatsappNumber' in data) || (data.whatsappNumber is string && data.whatsappNumber.size() <= 50)) &&
              (!('createdAt' in data) || data.createdAt is timestamp) &&
@@ -92,7 +94,10 @@ service cloud.firestore {
     match /listings/{listingId} {
       allow get, list: if isSignedIn();
       allow create: if isSignedIn() && incoming().ownerId == request.auth.uid && isValidListing(incoming());
-      allow update: if isSignedIn() && resource != null && 'ownerId' in resource.data && resource.data.ownerId == request.auth.uid && incoming().ownerId == resource.data.ownerId && isValidListing(incoming());
+      allow update: if isSignedIn() && resource != null && (
+        (resource.data.ownerId == request.auth.uid && incoming().ownerId == resource.data.ownerId && isValidListing(incoming())) ||
+        (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['viewsCount', 'updatedAt']) && incoming().viewsCount == resource.data.viewsCount + 1)
+      );
       allow delete: if isSignedIn() && resource != null && 'ownerId' in resource.data && resource.data.ownerId == request.auth.uid;
     }
   }

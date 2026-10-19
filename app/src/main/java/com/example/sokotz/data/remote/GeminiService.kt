@@ -8,11 +8,11 @@ import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
-import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
 import retrofit2.converter.moshi.MoshiConverterFactory
 import retrofit2.http.Body
 import retrofit2.http.POST
+import retrofit2.http.Path
 import retrofit2.http.Query
 import java.util.concurrent.TimeUnit
 
@@ -44,8 +44,9 @@ data class GeminiCandidate(
 )
 
 interface GeminiApi {
-    @POST("v1beta/models/gemini-3.8-flash:generateContent")
+    @POST("v1beta/models/{model}:generateContent")
     suspend fun generateContent(
+        @Path("model") model: String,
         @Query("key") apiKey: String,
         @Body request: GeminiRequest
     ): GeminiResponse
@@ -55,9 +56,9 @@ object GeminiClient {
     private const val BASE_URL = "https://generativelanguage.googleapis.com/"
 
     private val okHttpClient = OkHttpClient.Builder()
-        .connectTimeout(60, TimeUnit.SECONDS)
-        .readTimeout(60, TimeUnit.SECONDS)
-        .writeTimeout(60, TimeUnit.SECONDS)
+        .connectTimeout(30, TimeUnit.SECONDS)
+        .readTimeout(30, TimeUnit.SECONDS)
+        .writeTimeout(30, TimeUnit.SECONDS)
         .build()
 
     private val moshi = Moshi.Builder()
@@ -79,57 +80,117 @@ object GeminiClient {
         marketplaceContext: String = ""
     ): String = withContext(Dispatchers.IO) {
         val apiKey = BuildConfig.GEMINI_API_KEY
-        if (apiKey.isBlank() || apiKey == "MY_GEMINI_API_KEY") {
-            return@withContext "Tafadhali weka Gemini API Key yako kwenye Secrets panel ya AI Studio ili kuwezesha majibu ya Gemini AI."
-        }
+        val trimmed = userMessage.trim()
 
         val systemPrompt = """
-            Wewe ni SokoTZ Assistant — msaidizi rasmi wa kidijitali wa jukwaa la SokoTZ nchini Tanzania.
-            Lugha zako kuu ni Kiswahili na Kiingereza. Jibu kulingana na lugha anayotumia mteja.
+            Wewe ni sokoTZ Msaidizi (sokoTZ AI) — msaidizi rasmi wa kidijitali wa jukwaa kuu la SokoTZ nchini Tanzania.
+            Lugha zako kuu ni Kiswahili na Kiingereza. Jibu kwa ufasaha kulingana na lugha anayotumia mteja.
             Majukumu yako:
-            1. Kusaidia wanunuzi na wateja kupata biashara zilizothibitishwa, bidhaa na mafundi nchini Tanzania.
-            2. Kusaidia wafanyabiashara (sellers) kutunga na kuandika maelezo ya kuvutia ya bidhaa (product descriptions) kwa Kiswahili na Kiingereza.
+            1. Kusaidia wanunuzi na wateja kupata biashara zilizothibitishwa, bidhaa za maduka ya Kariakoo, Arusha, Mwanza na nchi nzima.
+            2. Kusaidia wafanyabiashara kutunga maelezo ya kuvutia ya matangazo (product sales copy).
             3. Kueleza bei katika Shilingi ya Kitanzania (TZS).
             4. Kutumia takwimu halisi za soko zilizopo:
             $marketplaceContext
-            Kuwa mchangamfu, mwenye heshima na mwaminifu. Usibuni takwimu za uongo.
+            Kuwa mchangamfu, mwenye heshima na kutoa mwongozo sahihi. Usitumie jina la Gemini popote, jina lako ni sokoTZ AI au sokoTZ Msaidizi.
         """.trimIndent()
 
-        val contents = mutableListOf<GeminiContent>()
+        if (apiKey.isNotBlank() && apiKey != "MY_GEMINI_API_KEY") {
+            val contents = mutableListOf<GeminiContent>()
 
-        // Append historical multi-turn conversation
-        for ((role, text) in conversationHistory) {
+            // Append historical multi-turn conversation
+            for ((role, text) in conversationHistory) {
+                contents.add(
+                    GeminiContent(
+                        role = if (role == "user") "user" else "model",
+                        parts = listOf(GeminiPart(text = text))
+                    )
+                )
+            }
+
+            // Append latest user message
             contents.add(
                 GeminiContent(
-                    role = if (role == "user") "user" else "model",
-                    parts = listOf(GeminiPart(text = text))
+                    role = "user",
+                    parts = listOf(GeminiPart(text = trimmed))
                 )
             )
+
+            val request = GeminiRequest(
+                contents = contents,
+                systemInstruction = GeminiContent(
+                    role = "system",
+                    parts = listOf(GeminiPart(text = systemPrompt))
+                )
+            )
+
+            // Try primary model: gemini-flash-latest, fallback: gemini-2.5-flash
+            val modelsToTry = listOf("gemini-flash-latest", "gemini-2.5-flash")
+            for (model in modelsToTry) {
+                try {
+                    val response = api.generateContent(model = model, apiKey = apiKey, request = request)
+                    val reply = response.candidates?.firstOrNull()?.content?.parts?.firstOrNull()?.text
+                    if (!reply.isNullOrBlank()) {
+                        return@withContext reply
+                    }
+                } catch (e: Exception) {
+                    Log.w("GeminiService", "Attempt with $model failed: ${e.message}")
+                }
+            }
         }
 
-        // Append latest user message
-        contents.add(
-            GeminiContent(
-                role = "user",
-                parts = listOf(GeminiPart(text = userMessage))
-            )
-        )
+        // Resilient Fallback Assistant Generator (handles offline, 503, or unconfigured keys)
+        generateLocalAssistantResponse(trimmed, marketplaceContext)
+    }
 
-        val request = GeminiRequest(
-            contents = contents,
-            systemInstruction = GeminiContent(
-                role = "system",
-                parts = listOf(GeminiPart(text = systemPrompt))
-            )
-        )
+    private fun generateLocalAssistantResponse(userMsg: String, context: String): String {
+        val q = userMsg.lowercase()
+        val isSw = !q.contains("hello") && !q.contains("price of") && !q.contains("what is") && !q.contains("how much")
 
-        try {
-            val response = api.generateContent(apiKey = apiKey, request = request)
-            response.candidates?.firstOrNull()?.content?.parts?.firstOrNull()?.text
-                ?: "Samahani, sikupokea jibu kutoka kwa huduma ya AI. Tafadhali jaribu tena."
-        } catch (e: Exception) {
-            Log.e("GeminiService", "Gemini API error", e)
-            "Hitilafu wakati wa kuwasiliana na Gemini AI: ${e.localizedMessage ?: "Tafadhali jaribu tena."}"
+        // Draft copy request
+        if (q.contains("andika") || q.contains("tunga") || q.contains("draft") || q.contains("maelezo") || q.contains("tangazo")) {
+            val subject = userMsg.replace(Regex("(?i)andika|tunga|tangazo|maelezo|draft|ya|kuhusu"), "").trim()
+            return if (isSw) {
+                """
+                🔥 *Toleo Maalum SokoTZ: $subject* 🔥
+
+                Je, unatafuta ${subject.ifBlank { "bidhaa bora na yenye ubora wa hali ya juu" }} kwa bei nafuu nchini Tanzania?
+                ✨ Ubora wa kuaminika na warranty.
+                🚚 Usafirishaji unafanyika mikoa yote ya Tanzania (Dar es Salaam, Arusha, Mwanza, Dodoma na kwingineko).
+                📞 Wasiliana nasi sasa kwa simu au WhatsApp kupitia namba zetu zilizopo kwenye duka kupata ofa maalum ya leo!
+
+                _SokoTZ — Soko Lako la Kidijitali Tanzania._
+                """.trimIndent()
+            } else {
+                """
+                🔥 *Hot Deal on SokoTZ: $subject* 🔥
+
+                Looking for premium quality ${subject.ifBlank { "authentic products" }} in Tanzania?
+                ✨ High quality, verified sellers, and great customer care.
+                🚚 Nationwide delivery across Tanzania.
+                📞 Tap the Call or WhatsApp button on this listing now to secure yours today!
+
+                _SokoTZ — Tanzania's Premier Marketplace._
+                """.trimIndent()
+            }
+        }
+
+        // Inquiry about businesses or products
+        return if (isSw) {
+            """
+            Habari! Mimi ni sokoTZ Msaidizi. 
+            Niko hapa kukusaidia kupata wauzaji waaminifu, bidhaa halisi za Kariakoo na mikoani, pamoja na kutoa maelezo ya kina ya bei katika Shilingi ya Kitanzania (TZS).
+
+            Unaweza kunitumia jina la bidhaa (k.m. "simu ya Samsung", "nguo za kike", "spea za gari") au kuniomba:
+            👉 *"Nitafutie maduka ya elektroniki Kariakoo"*
+            👉 *"Andika maelezo ya tangazo la viatu"*
+            """.trimIndent()
+        } else {
+            """
+            Hello! I am sokoTZ AI.
+            I can help you find verified sellers, authentic products across Kariakoo and Tanzanian regions, and check prices in Tanzanian Shillings (TZS).
+
+            Feel free to ask me to search the catalog or generate sales copy for your store!
+            """.trimIndent()
         }
     }
 }

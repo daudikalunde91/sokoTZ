@@ -92,6 +92,8 @@ data class Listing(
     val status: String = "PUBLISHED",
     val city: String = "Dar es Salaam",
     val isFeatured: Boolean = false,
+    val imageUrl: String = "",
+    val viewsCount: Long = 0L,
     val phoneNumber: String = "",
     val whatsappNumber: String = "",
     @ServerTimestamp val createdAt: Timestamp? = null,

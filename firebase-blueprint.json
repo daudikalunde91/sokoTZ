@@ -1,0 +1,84 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "Registered SokoTZ user profile",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "Auth UID" },
+        "displayName": { "type": "string", "description": "User display name" },
+        "email": { "type": "string", "description": "Email address" },
+        "phoneNumber": { "type": "string", "description": "Phone number" },
+        "role": { "type": "string", "description": "CUSTOMER or BUSINESS_OWNER" },
+        "hasAcceptedTerms": { "type": "boolean", "description": "User accepted Terms and Conditions" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "displayName", "role"]
+    },
+    "Business": {
+      "title": "Business",
+      "description": "SokoTZ business entity",
+      "type": "object",
+      "properties": {
+        "ownerId": { "type": "string" },
+        "name": { "type": "string" },
+        "categorySlug": { "type": "string" },
+        "categoryName": { "type": "string" },
+        "descriptionSw": { "type": "string" },
+        "descriptionEn": { "type": "string" },
+        "city": { "type": "string" },
+        "district": { "type": "string" },
+        "phoneNumber": { "type": "string" },
+        "whatsappNumber": { "type": "string" },
+        "isVerified": { "type": "boolean" },
+        "rating": { "type": "number" },
+        "reviewCount": { "type": "integer" },
+        "openingHours": { "type": "string" },
+        "address": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["ownerId", "name", "categorySlug", "city", "phoneNumber", "whatsappNumber"]
+    },
+    "Listing": {
+      "title": "Listing",
+      "description": "Product or service listing",
+      "type": "object",
+      "properties": {
+        "businessId": { "type": "string" },
+        "ownerId": { "type": "string" },
+        "businessName": { "type": "string" },
+        "titleSw": { "type": "string" },
+        "titleEn": { "type": "string" },
+        "descriptionSw": { "type": "string" },
+        "descriptionEn": { "type": "string" },
+        "priceTzs": { "type": "integer" },
+        "categorySlug": { "type": "string" },
+        "type": { "type": "string" },
+        "status": { "type": "string" },
+        "city": { "type": "string" },
+        "isFeatured": { "type": "boolean" },
+        "phoneNumber": { "type": "string" },
+        "whatsappNumber": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["businessId", "ownerId", "businessName", "titleSw", "priceTzs", "categorySlug", "type"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/User" },
+      "description": "User profile collection"
+    },
+    "/businesses/{businessId}": {
+      "schema": { "$ref": "#/entities/Business" },
+      "description": "Marketplace businesses collection"
+    },
+    "/listings/{listingId}": {
+      "schema": { "$ref": "#/entities/Listing" },
+      "description": "Marketplace listings collection"
+    }
+  }
+}

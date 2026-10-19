@@ -1,0 +1,400 @@
+package com.example.sokotz.data.repository
+
+import android.content.Context
+import android.util.Log
+import com.example.R
+import com.example.sokotz.data.model.AppLanguage
+import com.example.sokotz.data.model.AssistantMessage
+import com.example.sokotz.data.model.BusinessProfile
+import com.example.sokotz.data.model.Category
+import com.example.sokotz.data.model.Listing
+import com.example.sokotz.data.remote.GeminiClient
+import com.example.sokotz.data.remote.OperationType
+import com.example.sokotz.data.remote.handleFirestoreError
+import com.google.firebase.Firebase
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.auth.auth
+import com.google.firebase.firestore.FieldValue
+import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.ListenerRegistration
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.channels.awaitClose
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
+import java.util.UUID
+
+class FirestoreMarketplaceRepository(
+    private val db: FirebaseFirestore,
+    private val auth: FirebaseAuth = Firebase.auth
+) {
+
+    constructor(context: Context) : this(
+        FirebaseFirestore.getInstance(
+            context.applicationContext.getString(R.string.firestore_database_id)
+        ),
+        Firebase.auth
+    )
+
+    private fun requireUserId(): String {
+        return auth.currentUser?.uid
+            ?: throw IllegalStateException("User must be signed in with Google before accessing Firestore.")
+    }
+
+    private val _categories = MutableStateFlow<List<Category>>(MarketplaceData.categories)
+    val categories: StateFlow<List<Category>> = _categories.asStateFlow()
+
+    private val _businesses = MutableStateFlow<List<BusinessProfile>>(emptyList())
+    val businesses: StateFlow<List<BusinessProfile>> = _businesses.asStateFlow()
+
+    private val _listings = MutableStateFlow<List<Listing>>(emptyList())
+    val listings: StateFlow<List<Listing>> = _listings.asStateFlow()
+
+    private val _language = MutableStateFlow(AppLanguage.SW)
+    val language: StateFlow<AppLanguage> = _language.asStateFlow()
+
+    private val _assistantMessages = MutableStateFlow<List<AssistantMessage>>(
+        listOf(
+            AssistantMessage(
+                id = "msg_init",
+                isUser = false,
+                text = "Habari! Karibu sokoTZ AI (Msaidizi wa SokoTZ). Naweza kukusaidia kupata biashara na bidhaa halisi Tanzania, au kukusaidia kuandika maelezo ya tangazo lako."
+            )
+        )
+    )
+    val assistantMessages: StateFlow<List<AssistantMessage>> = _assistantMessages.asStateFlow()
+
+    private val _isAssistantThinking = MutableStateFlow(false)
+    val isAssistantThinking: StateFlow<Boolean> = _isAssistantThinking.asStateFlow()
+
+    private var businessesListener: ListenerRegistration? = null
+    private var listingsListener: ListenerRegistration? = null
+
+    private val authStateListener = FirebaseAuth.AuthStateListener { firebaseAuth ->
+        val user = firebaseAuth.currentUser
+        if (user != null) {
+            startRealtimeListeners()
+        } else {
+            stopRealtimeListeners()
+        }
+    }
+
+    init {
+        auth.addAuthStateListener(authStateListener)
+        if (auth.currentUser != null) {
+            startRealtimeListeners()
+        }
+    }
+
+    fun setLanguage(lang: AppLanguage) {
+        _language.value = lang
+    }
+
+    fun toggleLanguage() {
+        _language.value = if (_language.value == AppLanguage.SW) AppLanguage.EN else AppLanguage.SW
+    }
+
+    private fun startRealtimeListeners() {
+        if (auth.currentUser == null) return
+        if (businessesListener != null && listingsListener != null) return
+
+        businessesListener?.remove()
+        businessesListener = db.collection("businesses")
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) {
+                    handleFirestoreError(error, OperationType.LIST, "businesses")
+                    return@addSnapshotListener
+                }
+                if (snapshot != null) {
+                    val list = snapshot.documents.mapNotNull { doc ->
+                        doc.toObject(BusinessProfile::class.java)?.copy(id = doc.id)
+                    }
+                    _businesses.value = list
+                }
+            }
+
+        listingsListener?.remove()
+        listingsListener = db.collection("listings")
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) {
+                    handleFirestoreError(error, OperationType.LIST, "listings")
+                    return@addSnapshotListener
+                }
+                if (snapshot != null) {
+                    val list = snapshot.documents.mapNotNull { doc ->
+                        doc.toObject(Listing::class.java)?.copy(id = doc.id)
+                    }
+                    _listings.value = list
+                }
+            }
+    }
+
+    private fun stopRealtimeListeners() {
+        businessesListener?.remove()
+        businessesListener = null
+        listingsListener?.remove()
+        listingsListener = null
+        _businesses.value = emptyList()
+        _listings.value = emptyList()
+    }
+
+    fun observeListings(): Flow<List<Listing>> = _listings
+
+    fun observeBusinesses(): Flow<List<BusinessProfile>> = _businesses
+
+    suspend fun getBusiness(businessId: String): BusinessProfile? {
+        if (auth.currentUser == null) return null
+        val path = "businesses/$businessId"
+        return try {
+            val doc = db.collection("businesses").document(businessId).get().await()
+            doc.toObject(BusinessProfile::class.java)?.copy(id = doc.id)
+        } catch (e: Exception) {
+            handleFirestoreError(e, OperationType.GET, path)
+            throw e
+        }
+    }
+
+    suspend fun getListing(listingId: String): Listing? {
+        if (auth.currentUser == null) return null
+        val path = "listings/$listingId"
+        return try {
+            val doc = db.collection("listings").document(listingId).get().await()
+            doc.toObject(Listing::class.java)?.copy(id = doc.id)
+        } catch (e: Exception) {
+            handleFirestoreError(e, OperationType.GET, path)
+            throw e
+        }
+    }
+
+    fun getBusinessById(businessId: String): BusinessProfile? {
+        return _businesses.value.firstOrNull { it.id == businessId }
+    }
+
+    fun getListingById(listingId: String): Listing? {
+        return _listings.value.firstOrNull { it.id == listingId }
+    }
+
+    fun getListingsForBusiness(businessId: String): List<Listing> {
+        return _listings.value.filter { it.businessId == businessId }
+    }
+
+    fun filterListings(
+        query: String = "",
+        categorySlug: String? = null,
+        city: String? = null,
+        type: String? = null
+    ): List<Listing> {
+        val q = query.trim().lowercase()
+        return _listings.value.filter { listing ->
+            val matchesQuery = q.isEmpty() ||
+                    listing.titleSw.lowercase().contains(q) ||
+                    listing.titleEn.lowercase().contains(q) ||
+                    listing.descriptionSw.lowercase().contains(q) ||
+                    listing.descriptionEn.lowercase().contains(q) ||
+                    listing.businessName.lowercase().contains(q)
+
+            val matchesCategory = categorySlug == null || categorySlug == "all" || listing.categorySlug == categorySlug
+            val matchesCity = city == null || city == "Tanzania Nzima" || listing.city.equals(city, ignoreCase = true)
+            val matchesType = type == null || listing.type.equals(type, ignoreCase = true)
+
+            matchesQuery && matchesCategory && matchesCity && matchesType
+        }
+    }
+
+    suspend fun registerBusinessProfile(
+        name: String,
+        categorySlug: String,
+        city: String,
+        district: String,
+        phoneNumber: String,
+        whatsappNumber: String,
+        description: String
+    ): Result<String> {
+        val currentUserId = try {
+            requireUserId()
+        } catch (e: Exception) {
+            return Result.failure(e)
+        }
+
+        val categoryName = _categories.value.firstOrNull { it.slug == categorySlug }?.nameSw ?: "Biashara"
+        val docRef = db.collection("businesses").document()
+
+        val payload = hashMapOf(
+            "ownerId" to currentUserId,
+            "name" to name.trim(),
+            "categorySlug" to categorySlug,
+            "categoryName" to categoryName,
+            "descriptionSw" to description.trim(),
+            "descriptionEn" to description.trim(),
+            "city" to city.trim(),
+            "district" to district.trim(),
+            "phoneNumber" to phoneNumber.trim(),
+            "whatsappNumber" to whatsappNumber.trim(),
+            "isVerified" to false,
+            "rating" to 5.0,
+            "reviewCount" to 0,
+            "openingHours" to "Jumatatu - Jumamosi: 08:00 - 18:00",
+            "address" to "$district, $city",
+            "createdAt" to FieldValue.serverTimestamp(),
+            "updatedAt" to FieldValue.serverTimestamp()
+        )
+
+        return try {
+            docRef.set(payload).await()
+            Result.success(docRef.id)
+        } catch (e: Exception) {
+            handleFirestoreError(e, OperationType.CREATE, docRef.path)
+            Result.failure(e)
+        }
+    }
+
+    suspend fun createListing(
+        businessId: String,
+        businessName: String,
+        title: String,
+        priceTzs: Long,
+        categorySlug: String,
+        description: String,
+        type: String,
+        city: String,
+        phoneNumber: String,
+        whatsappNumber: String
+    ): Result<String> {
+        val currentUserId = try {
+            requireUserId()
+        } catch (e: Exception) {
+            return Result.failure(e)
+        }
+
+        val docRef = db.collection("listings").document()
+
+        val payload = hashMapOf(
+            "businessId" to businessId,
+            "ownerId" to currentUserId,
+            "businessName" to businessName,
+            "titleSw" to title.trim(),
+            "titleEn" to title.trim(),
+            "descriptionSw" to description.trim(),
+            "descriptionEn" to description.trim(),
+            "priceTzs" to priceTzs,
+            "categorySlug" to categorySlug,
+            "type" to type,
+            "status" to "PUBLISHED",
+            "city" to city.trim(),
+            "isFeatured" to false,
+            "phoneNumber" to phoneNumber.trim(),
+            "whatsappNumber" to whatsappNumber.trim(),
+            "createdAt" to FieldValue.serverTimestamp(),
+            "updatedAt" to FieldValue.serverTimestamp()
+        )
+
+        return try {
+            docRef.set(payload).await()
+            Result.success(docRef.id)
+        } catch (e: Exception) {
+            handleFirestoreError(e, OperationType.CREATE, docRef.path)
+            Result.failure(e)
+        }
+    }
+
+    fun sendAssistantMessage(userText: String, scope: CoroutineScope) {
+        val trimmed = userText.trim()
+        if (trimmed.isEmpty()) return
+
+        val userMsg = AssistantMessage(
+            id = "user_${UUID.randomUUID()}",
+            isUser = true,
+            text = trimmed
+        )
+        _assistantMessages.value = _assistantMessages.value + userMsg
+        _isAssistantThinking.value = true
+
+        scope.launch(Dispatchers.IO) {
+            try {
+                val history = _assistantMessages.value.dropLast(1).map {
+                    (if (it.isUser) "user" else "model") to it.text
+                }
+
+                val activeListings = _listings.value.take(15)
+                val activeBusinesses = _businesses.value.take(10)
+                val marketplaceContext = buildString {
+                    appendLine("Orodha ya Biashara zilizosajiliwa SokoTZ:")
+                    activeBusinesses.forEach {
+                        appendLine("- ${it.name} (${it.categoryName}, ${it.city}). Simu: ${it.phoneNumber}")
+                    }
+                    appendLine("Orodha ya Bidhaa na Huduma za sasa:")
+                    activeListings.forEach {
+                        appendLine("- ${it.titleSw} | Bei: TZS ${it.priceTzs} | Muuzaji: ${it.businessName} (${it.city})")
+                    }
+                }
+
+                val aiResponse = GeminiClient.chat(
+                    conversationHistory = history,
+                    userMessage = trimmed,
+                    marketplaceContext = marketplaceContext
+                )
+
+                val matchedListings = _listings.value.filter { listing ->
+                    val queryTerms = trimmed.lowercase().split(" ").filter { it.length > 2 }
+                    val itemText = "${listing.titleSw} ${listing.businessName} ${listing.categorySlug}".lowercase()
+                    queryTerms.any { itemText.contains(it) }
+                }.take(3)
+
+                val isDraft = trimmed.lowercase().contains("andika") ||
+                        trimmed.lowercase().contains("tunga") ||
+                        trimmed.lowercase().contains("draft") ||
+                        trimmed.lowercase().contains("maelezo")
+
+                val assistantMsg = AssistantMessage(
+                    id = "asst_${UUID.randomUUID()}",
+                    isUser = false,
+                    text = aiResponse,
+                    referencedListings = matchedListings,
+                    isAiDraft = isDraft
+                )
+
+                _assistantMessages.value = _assistantMessages.value + assistantMsg
+            } catch (e: Exception) {
+                Log.e("FirestoreRepo", "Assistant error", e)
+                val errorMsg = AssistantMessage(
+                    id = "asst_err_${UUID.randomUUID()}",
+                    isUser = false,
+                    text = "Samahani, kumekuwa na changamoto ya mtandao kufikia Gemini AI. Tafadhali jaribu tena."
+                )
+                _assistantMessages.value = _assistantMessages.value + errorMsg
+            } finally {
+                _isAssistantThinking.value = false
+            }
+        }
+    }
+
+    fun clearAssistantConversation() {
+        val isSw = _language.value == AppLanguage.SW
+        _assistantMessages.value = listOf(
+            AssistantMessage(
+                id = "msg_${System.currentTimeMillis()}",
+                isUser = false,
+                text = if (isSw)
+                    "Mazungumzo mapya yameanza. Nawezaje kukusaidia kwenye SokoTZ leo?"
+                else
+                    "New conversation started. How may I assist you with SokoTZ marketplace today?"
+            )
+        )
+    }
+
+    companion object {
+        @Volatile
+        private var instance: FirestoreMarketplaceRepository? = null
+
+        fun getInstance(context: Context): FirestoreMarketplaceRepository {
+            return instance ?: synchronized(this) {
+                instance ?: FirestoreMarketplaceRepository(context.applicationContext).also { instance = it }
+            }
+        }
+    }
+}

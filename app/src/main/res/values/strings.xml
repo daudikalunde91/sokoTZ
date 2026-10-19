@@ -1,0 +1,78 @@
+<resources>
+    <string name="app_name">SokoTZ</string>
+    <string name="app_tagline">Tanzania Marketplace &amp; Business Discovery</string>
+
+    <!-- Navigation -->
+    <string name="nav_discover">Discover</string>
+    <string name="nav_search">Search</string>
+    <string name="nav_assistant">Assistant</string>
+    <string name="nav_business">My Business</string>
+    <string name="nav_account">Account</string>
+
+    <!-- Discovery / Home -->
+    <string name="search_placeholder">Search businesses, products, services...</string>
+    <string name="featured_businesses">Featured Businesses</string>
+    <string name="popular_categories">Categories</string>
+    <string name="recent_listings">Recent Products &amp; Services</string>
+    <string name="filter_location">Location</string>
+    <string name="filter_category">Category</string>
+    <string name="all_locations">All Tanzania</string>
+    <string name="all_categories">All Categories</string>
+
+    <!-- Business & Listings -->
+    <string name="verified_business">Verified SokoTZ Business</string>
+    <string name="contact_phone">Call Business</string>
+    <string name="contact_whatsapp">Chat on WhatsApp</string>
+    <string name="business_hours">Opening Hours</string>
+    <string name="business_location">Location</string>
+    <string name="about_business">About</string>
+    <string name="listings_title">Products &amp; Services</string>
+    <string name="view_details">View Details</string>
+
+    <!-- Business Management / Seller -->
+    <string name="seller_dashboard">Seller Dashboard</string>
+    <string name="onboarding_title">Register Your Business on SokoTZ</string>
+    <string name="business_name">Business Name</string>
+    <string name="business_category">Business Category</string>
+    <string name="phone_number">Phone Number</string>
+    <string name="whatsapp_number">WhatsApp Number</string>
+    <string name="save_business">Save Business Profile</string>
+    <string name="add_listing">Add New Listing</string>
+    <string name="listing_title">Item / Service Title</string>
+    <string name="listing_price">Price (TZS)</string>
+    <string name="listing_description">Description</string>
+    <string name="publish_listing">Publish Listing</string>
+    <string name="ai_draft_helper">Need help writing? Ask SokoTZ Assistant</string>
+
+    <!-- Auth -->
+    <string name="login_title">Log In to SokoTZ</string>
+    <string name="register_title">Create SokoTZ Account</string>
+    <string name="email_or_phone">Email or Phone Number</string>
+    <string name="password">Password</string>
+    <string name="full_name">Full Name</string>
+    <string name="role_selector">Account Role</string>
+    <string name="role_customer">Customer / Buyer</string>
+    <string name="role_seller">Business Owner / Seller</string>
+    <string name="login_action">Log In</string>
+    <string name="register_action">Create Account</string>
+    <string name="logout_action">Log Out</string>
+    <string name="forgot_password">Forgot Password?</string>
+    <string name="no_account">Don\'t have an account? Sign Up</string>
+    <string name="have_account">Already have an account? Log In</string>
+
+    <!-- Assistant -->
+    <string name="assistant_title">SokoTZ Assistant</string>
+    <string name="assistant_disclaimer">AI-powered assistant grounded in real SokoTZ marketplace data. Always verify listings directly.</string>
+    <string name="assistant_hint">Ask in Kiswahili or English (e.g. Mafundi umeme Dar, or wholesale rice)...</string>
+    <string name="assistant_send">Send</string>
+    <string name="new_conversation">New Conversation</string>
+
+    <!-- Common -->
+    <string name="loading">Loading SokoTZ...</string>
+    <string name="empty_results">No matching businesses or items found</string>
+    <string name="try_different_filter">Try adjusting your filters or search terms</string>
+    <string name="retry">Retry</string>
+    <string name="error_generic">Something went wrong. Please check your connection.</string>
+    <string name="tzs_currency">TZS</string>
+    <string name="language_toggle">Lugha / Language</string>
+</resources>

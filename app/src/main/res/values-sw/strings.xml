@@ -1,0 +1,78 @@
+<resources>
+    <string name="app_name">SokoTZ</string>
+    <string name="app_tagline">Soko Kuu la Kidijitali na Ugunduzi wa Biashara Tanzania</string>
+
+    <!-- Navigation -->
+    <string name="nav_discover">Gundua</string>
+    <string name="nav_search">Tafuta</string>
+    <string name="nav_assistant">Msaidizi</string>
+    <string name="nav_business">Biashara Yangu</string>
+    <string name="nav_account">Akaunti</string>
+
+    <!-- Discovery / Home -->
+    <string name="search_placeholder">Tafuta biashara, bidhaa, huduma...</string>
+    <string name="featured_businesses">Biashara Zilizoangaziwa</string>
+    <string name="popular_categories">Makundi ya Biashara</string>
+    <string name="recent_listings">Bidhaa na Huduma za Hivi Karibuni</string>
+    <string name="filter_location">Eneo</string>
+    <string name="filter_category">Kundi</string>
+    <string name="all_locations">Tanzania Nzima</string>
+    <string name="all_categories">Makundi Yote</string>
+
+    <!-- Business & Listings -->
+    <string name="verified_business">Biashara Iliyothibitishwa SokoTZ</string>
+    <string name="contact_phone">Piga Simu</string>
+    <string name="contact_whatsapp">Wasiliana kwa WhatsApp</string>
+    <string name="business_hours">Masaa ya Kazi</string>
+    <string name="business_location">Mahali Biashara Ilipo</string>
+    <string name="about_business">Kuhusu Biashara</string>
+    <string name="listings_title">Bidhaa na Huduma</string>
+    <string name="view_details">Tazama Zaidi</string>
+
+    <!-- Business Management / Seller -->
+    <string name="seller_dashboard">Dashibodi ya Muuzaji</string>
+    <string name="onboarding_title">Sajili Biashara Yako SokoTZ</string>
+    <string name="business_name">Jina la Biashara</string>
+    <string name="business_category">Kundi la Biashara</string>
+    <string name="phone_number">Namba ya Simu</string>
+    <string name="whatsapp_number">Namba ya WhatsApp</string>
+    <string name="save_business">Hifadhi Taarifa za Biashara</string>
+    <string name="add_listing">Ongeza Bidhaa/Huduma Mpya</string>
+    <string name="listing_title">Kichwa cha Bidhaa au Huduma</string>
+    <string name="listing_price">Bei (TZS)</string>
+    <string name="listing_description">Maelezo Kamili</string>
+    <string name="publish_listing">Chapisha Tangazo</string>
+    <string name="ai_draft_helper">Unahitaji usaidizi wa kuandika? Muulize Msaidizi wa SokoTZ</string>
+
+    <!-- Auth -->
+    <string name="login_title">Ingia kwenye SokoTZ</string>
+    <string name="register_title">Fungua Akaunti ya SokoTZ</string>
+    <string name="email_or_phone">Barua Pepe au Namba ya Simu</string>
+    <string name="password">Nenosiri</string>
+    <string name="full_name">Jina Kamili</string>
+    <string name="role_selector">Aina ya Akaunti</string>
+    <string name="role_customer">Mteja / Mnunuzi</string>
+    <string name="role_seller">Mwenye Biashara / Muuzaji</string>
+    <string name="login_action">Ingia</string>
+    <string name="register_action">Fungua Akaunti</string>
+    <string name="logout_action">Ondoka</string>
+    <string name="forgot_password">Umesahau Nenosiri?</string>
+    <string name="no_account">Huna akaunti? Jisajili Sasa</string>
+    <string name="have_account">Tayari una akaunti? Ingia</string>
+
+    <!-- Assistant -->
+    <string name="assistant_title">Msaidizi wa SokoTZ</string>
+    <string name="assistant_disclaimer">Msaidizi wa AI anayetumia takwimu halisi za SokoTZ pekee. Thibitisha biashara moja kwa moja.</string>
+    <string name="assistant_hint">Uliza kwa Kiswahili au Kiingereza (mf. Mafundi umeme Kariakoo, au mchele wa Mbeya)...</string>
+    <string name="assistant_send">Tuma</string>
+    <string name="new_conversation">Mazungumzo Mapya</string>
+
+    <!-- Common -->
+    <string name="loading">Inapakia SokoTZ...</string>
+    <string name="empty_results">Hakuna biashara au bidhaa zilizopatikana</string>
+    <string name="try_different_filter">Jaribu kubadilisha vichujio au maneno ya utafutaji</string>
+    <string name="retry">Jaribu Tena</string>
+    <string name="error_generic">Hitilafu imetokea. Tafadhali angalia mtandao wako.</string>
+    <string name="tzs_currency">TZS</string>
+    <string name="language_toggle">Lugha / Language</string>
+</resources>

@@ -145,12 +145,12 @@ fun AssistantScreen(
                     Spacer(modifier = Modifier.width(10.dp))
                     Column {
                         Text(
-                            text = if (isSw) "sokoTZ AI (Msaidizi wa SokoTZ)" else "sokoTZ AI (SokoTZ Assistant)",
+                            text = if (isSw) "sokoTZ Msaidizi" else "sokoTZ AI",
                             style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                             color = SokoLightText
                         )
                         Text(
-                            text = if (isSw) "Gemini 3.8 Flash • Mazungumzo ya Moja kwa Moja" else "Gemini 3.8 Flash • Multi-turn Live Chat",
+                            text = if (isSw) "Msaidizi Mahiri • Mazungumzo ya Moja kwa Moja" else "Intelligent Assistant • Multi-turn Live Chat",
                             style = MaterialTheme.typography.bodySmall,
                             color = SokoNeonBlue
                         )
@@ -189,9 +189,9 @@ fun AssistantScreen(
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
                     text = if (isSw)
-                        "Msaidizi anatumia modeli ya Gemini 3.8 Flash na data halisi za SokoTZ. Daima thibitisha taarifa moja kwa moja na wauzaji."
+                        "Msaidizi anatumia teknolojia ya sokoTZ Msaidizi na takwimu halisi za SokoTZ. Daima thibitisha taarifa moja kwa moja na wauzaji."
                     else
-                        "Powered by Gemini 3.8 Flash and grounded in live SokoTZ data. Always verify transaction terms directly with sellers.",
+                        "Powered by sokoTZ AI and grounded in live SokoTZ marketplace data. Always verify transaction terms directly with sellers.",
                     style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
                     color = SokoMutedText
                 )
@@ -221,7 +221,7 @@ fun AssistantScreen(
                 )
             }
 
-            // Gemini Thinking Indicator
+            // Assistant Thinking Indicator
             if (isThinking) {
                 item {
                     Row(
@@ -237,7 +237,7 @@ fun AssistantScreen(
                         )
                         Spacer(modifier = Modifier.width(10.dp))
                         Text(
-                            text = if (isSw) "Gemini inafikiri na kuandaa jibu..." else "Gemini is thinking...",
+                            text = if (isSw) "sokoTZ Msaidizi anafikiri na kuandaa jibu..." else "sokoTZ AI is thinking...",
                             style = MaterialTheme.typography.bodySmall,
                             color = SokoNeonViolet
                         )
@@ -369,7 +369,7 @@ fun MessageBubble(
     ) {
         // Sender label
         Text(
-            text = if (isUser) "Wewe / You" else "SokoTZ Gemini AI",
+            text = if (isUser) "Wewe / You" else if (language == AppLanguage.SW) "sokoTZ Msaidizi" else "sokoTZ AI",
             style = MaterialTheme.typography.labelSmall,
             color = if (isUser) SokoNeonBlue else SokoNeonViolet,
             modifier = Modifier.padding(bottom = 4.dp, start = if (isUser) 0.dp else 4.dp, end = if (isUser) 4.dp else 0.dp)

@@ -344,7 +344,7 @@ fun SignInScreen(
                                     return@Button
                                 }
                                 if (context is Activity) {
-                                    authManager.signInWithGoogle(context, scope)
+                                    authManager.signInStandard(context, signInEmail, scope)
                                 }
                             },
                             enabled = !isLoading,
@@ -566,16 +566,24 @@ fun SignInScreen(
                                     validationError = if (isSw) "Tafadhali weka namba yako ya simu." else "Please enter your phone number."
                                     return@Button
                                 }
-
-                                authManager.setPendingRegistration(
-                                    name = registerName,
-                                    phone = registerPhone,
-                                    role = registerRole,
-                                    acceptedTerms = hasAcceptedTerms
-                                )
+                                if (registerEmail.isBlank() || !registerEmail.contains("@")) {
+                                    validationError = if (isSw) "Tafadhali weka barua pepe sahihi." else "Please enter a valid email."
+                                    return@Button
+                                }
+                                if (registerPassword.length < 6) {
+                                    validationError = if (isSw) "Nenosiri lazima liwe na angalau tarakimu 6." else "Password must be at least 6 characters."
+                                    return@Button
+                                }
 
                                 if (context is Activity) {
-                                    authManager.signInWithGoogle(context, scope)
+                                    authManager.registerStandard(
+                                        activity = context,
+                                        displayName = registerName,
+                                        phone = registerPhone,
+                                        role = registerRole,
+                                        acceptedTerms = hasAcceptedTerms,
+                                        scope = scope
+                                    )
                                 }
                             },
                             enabled = !isLoading,

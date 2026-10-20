@@ -143,6 +143,31 @@ class AuthManager(private val context: Context) {
         }
     }
 
+    fun signInStandard(activity: Activity, email: String, scope: CoroutineScope) {
+        val trimmedEmail = email.trim()
+        if (trimmedEmail.isNotBlank()) {
+            pendingDisplayName = trimmedEmail.substringBefore("@")
+        }
+        signInWithGoogle(activity, scope)
+    }
+
+    fun registerStandard(
+        activity: Activity,
+        displayName: String,
+        phone: String,
+        role: String,
+        acceptedTerms: Boolean,
+        scope: CoroutineScope
+    ) {
+        setPendingRegistration(
+            name = displayName,
+            phone = phone,
+            role = role,
+            acceptedTerms = acceptedTerms
+        )
+        signInWithGoogle(activity, scope)
+    }
+
     private var pendingDisplayName: String? = null
     private var pendingPhoneNumber: String? = null
     private var pendingRole: String = "CUSTOMER"

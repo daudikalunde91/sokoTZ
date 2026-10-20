@@ -25,6 +25,7 @@ import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Store
+import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
@@ -33,11 +34,14 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
+import coil.compose.AsyncImage
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
@@ -74,6 +78,12 @@ fun ListingDetailScreen(
     val isSw = language == AppLanguage.SW
 
     val listing = repository.getListingById(listingId)
+
+    LaunchedEffect(listing?.id) {
+        listing?.id?.let { id ->
+            repository.incrementListingView(id)
+        }
+    }
 
     if (listing == null) {
         Box(
@@ -148,6 +158,21 @@ fun ListingDetailScreen(
                 .verticalScroll(rememberScrollState())
                 .padding(16.dp)
         ) {
+            // Optional Product Image
+            if (listing.imageUrl.isNotBlank()) {
+                AsyncImage(
+                    model = listing.imageUrl,
+                    contentDescription = listing.localizedTitle(language),
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(240.dp)
+                        .clip(RoundedCornerShape(16.dp))
+                        .border(1.dp, SokoCardBorder, RoundedCornerShape(16.dp))
+                )
+                Spacer(modifier = Modifier.height(14.dp))
+            }
+
             // Type & Location badges
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -183,6 +208,34 @@ fun ListingDetailScreen(
                 style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.ExtraBold),
                 color = SokoLightText
             )
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // Views Tracker Badge
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(SokoDeepNavy)
+                    .border(1.dp, SokoCardBorder, RoundedCornerShape(8.dp))
+                    .padding(horizontal = 10.dp, vertical = 6.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Visibility,
+                    contentDescription = "Views",
+                    tint = SokoNeonBlue,
+                    modifier = Modifier.size(16.dp)
+                )
+                Spacer(modifier = Modifier.width(6.dp))
+                Text(
+                    text = if (isSw)
+                        "Watazamaji ${listing.viewsCount} wameona tangazo hili"
+                    else
+                        "${listing.viewsCount} people have viewed this listing",
+                    style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.SemiBold),
+                    color = SokoLightText
+                )
+            }
 
             Spacer(modifier = Modifier.height(12.dp))
 

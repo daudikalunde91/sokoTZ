@@ -1,6 +1,11 @@
 package com.example.sokotz.ui.screens.business
 
+import android.graphics.Bitmap
+import android.net.Uri
 import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -19,21 +24,29 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Business
+import androidx.compose.material.icons.filled.CameraAlt
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Inventory2
 import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
@@ -42,9 +55,12 @@ import androidx.compose.material3.TabRow
 import androidx.compose.material3.TabRowDefaults
 import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -53,21 +69,26 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import coil.compose.AsyncImage
 import com.example.sokotz.data.auth.AuthManager
 import com.example.sokotz.data.model.AppLanguage
+import com.example.sokotz.data.model.Listing
 import com.example.sokotz.data.remote.GeminiClient
 import com.example.sokotz.data.repository.FirestoreMarketplaceRepository
+import com.example.sokotz.data.util.ImageUtils
 import com.example.sokotz.ui.components.ListingCard
 import com.example.ui.theme.SokoBlueBlack
 import com.example.ui.theme.SokoCardBorder
 import com.example.ui.theme.SokoCardSurface
 import com.example.ui.theme.SokoDeepNavy
 import com.example.ui.theme.SokoDeepPurple
+import com.example.ui.theme.SokoError
 import com.example.ui.theme.SokoGradients
 import com.example.ui.theme.SokoLightText
 import com.example.ui.theme.SokoMidnightBlue
@@ -75,6 +96,7 @@ import com.example.ui.theme.SokoMutedText
 import com.example.ui.theme.SokoNeonBlue
 import com.example.ui.theme.SokoNeonViolet
 import com.example.ui.theme.SokoSuccess
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
 @Composable
@@ -93,9 +115,13 @@ fun BusinessHubScreen(
     val listings by repository.listings.collectAsState()
     val isSw = language == AppLanguage.SW
 
-    var currentTab by remember { mutableStateOf(0) } // 0: Dashboard, 1: Add Listing, 2: Onboard Business
+    var currentTab by remember { mutableIntStateOf(0) } // 0: Dashboard, 1: Add Listing, 2: Onboard/Edit Business
+    var editingListing by remember { mutableStateOf<Listing?>(null) }
+    var listingToDelete by remember { mutableStateOf<Listing?>(null) }
 
     val userBusiness = businesses.firstOrNull { it.ownerId == (currentUser?.uid ?: "") }
+    val businessListings = listings.filter { it.ownerId == (currentUser?.uid ?: "") }
+    val totalViews = businessListings.sumOf { it.viewsCount }
 
     Column(
         modifier = modifier
@@ -111,14 +137,14 @@ fun BusinessHubScreen(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Column {
+                    Column(modifier = Modifier.weight(1f)) {
                         Text(
                             text = if (isSw) "Kituo cha Biashara Yako" else "Seller Hub & Management",
                             style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.ExtraBold),
                             color = SokoLightText
                         )
                         Text(
-                            text = userBusiness?.name ?: if (isSw) "Bado hujasajili biashara" else "No business registered yet",
+                            text = userBusiness?.name ?: if (isSw) "Bado hujasajili biashara rasmi" else "No business registered yet",
                             style = MaterialTheme.typography.bodyMedium,
                             color = SokoNeonBlue
                         )
@@ -164,7 +190,13 @@ fun BusinessHubScreen(
                     Tab(
                         selected = currentTab == 2,
                         onClick = { currentTab = 2 },
-                        text = { Text(if (isSw) "Sajili Biashara" else "Onboard Biz", fontWeight = FontWeight.Bold, color = if (currentTab == 2) SokoNeonBlue else SokoMutedText) }
+                        text = {
+                            Text(
+                                text = if (userBusiness != null) (if (isSw) "Hariri Biashara" else "Edit Biz") else (if (isSw) "Sajili Biashara" else "Onboard Biz"),
+                                fontWeight = FontWeight.Bold,
+                                color = if (currentTab == 2) SokoNeonBlue else SokoMutedText
+                            )
+                        }
                     )
                 }
             }
@@ -174,31 +206,40 @@ fun BusinessHubScreen(
         when (currentTab) {
             0 -> {
                 // Dashboard Tab
-                val businessListings = listings.filter { it.ownerId == (currentUser?.uid ?: "") }
                 LazyColumn(
                     modifier = Modifier.fillMaxSize(),
                     contentPadding = PaddingValues(16.dp),
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
-                    // Quick Stats Cards
+                    // Quick Stats Cards - with Impression/Views Tracker
                     item {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(12.dp)
-                        ) {
+                        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
+                                StatCard(
+                                    title = if (isSw) "Matangazo Yako Hai" else "Active Listings",
+                                    value = "${businessListings.size}",
+                                    icon = Icons.Default.Inventory2,
+                                    iconColor = SokoNeonBlue,
+                                    modifier = Modifier.weight(1f)
+                                )
+                                StatCard(
+                                    title = if (isSw) "Watazamaji Wote (Views)" else "Total Views",
+                                    value = "$totalViews",
+                                    icon = Icons.Default.Visibility,
+                                    iconColor = SokoNeonViolet,
+                                    modifier = Modifier.weight(1f)
+                                )
+                            }
+
                             StatCard(
-                                title = if (isSw) "Matangazo Yako Hai" else "Your Active Listings",
-                                value = "${businessListings.size}",
-                                icon = Icons.Default.Inventory2,
-                                iconColor = SokoNeonBlue,
-                                modifier = Modifier.weight(1f)
-                            )
-                            StatCard(
-                                title = if (isSw) "Biashara Yako" else "Business Status",
-                                value = if (userBusiness != null) (if (isSw) "Ipo Hai" else "Active") else (if (isSw) "Haijasajiliwa" else "None"),
+                                title = if (isSw) "Hali ya Duka / Biashara" else "Business Profile Status",
+                                value = if (userBusiness != null) (if (isSw) "Ipo Hai: ${userBusiness.name}" else "Active: ${userBusiness.name}") else (if (isSw) "Bofya Tab ya 3 Kusajili" else "Tap Tab 3 to Register"),
                                 icon = Icons.Default.Business,
-                                iconColor = SokoNeonViolet,
-                                modifier = Modifier.weight(1f)
+                                iconColor = if (userBusiness != null) SokoSuccess else SokoNeonBlue,
+                                modifier = Modifier.fillMaxWidth()
                             )
                         }
                     }
@@ -229,12 +270,12 @@ fun BusinessHubScreen(
                                 Spacer(modifier = Modifier.width(12.dp))
                                 Column(modifier = Modifier.weight(1f)) {
                                     Text(
-                                        text = if (isSw) "Msaidizi wa Gemini wa Kuandika Matangazo" else "Gemini AI Copywriter Assistant",
+                                        text = if (isSw) "sokoTZ Msaidizi wa Kuandika Matangazo" else "sokoTZ AI Copywriter Assistant",
                                         style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                                         color = SokoLightText
                                     )
                                     Text(
-                                        text = if (isSw) "Bofya hapa kuongea na AI ikusaidie kutunga maelezo ya mauzo" else "Chat with Gemini to draft sales copy and descriptions",
+                                        text = if (isSw) "Bofya hapa sokoTZ Msaidizi akusaidie kutunga maelezo ya mauzo" else "Chat with sokoTZ AI to draft sales copy and descriptions",
                                         style = MaterialTheme.typography.bodySmall,
                                         color = SokoMutedText
                                     )
@@ -296,26 +337,114 @@ fun BusinessHubScreen(
                         }
                     } else {
                         items(businessListings) { listing ->
-                            ListingCard(
-                                listing = listing,
-                                language = language,
-                                onClick = { onNavigateToListing(listing.id) }
-                            )
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(14.dp))
+                                    .background(SokoCardSurface)
+                                    .border(1.dp, SokoCardBorder, RoundedCornerShape(14.dp))
+                                    .padding(12.dp)
+                            ) {
+                                ListingCard(
+                                    listing = listing,
+                                    language = language,
+                                    onClick = { onNavigateToListing(listing.id) }
+                                )
+
+                                Spacer(modifier = Modifier.height(10.dp))
+
+                                // Seller Performance & Action Bar (Views Tracker, Edit, Delete)
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .background(SokoDeepNavy)
+                                        .padding(horizontal = 10.dp, vertical = 6.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Icon(
+                                            imageVector = Icons.Default.Visibility,
+                                            contentDescription = "Views",
+                                            tint = SokoNeonBlue,
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text(
+                                            text = if (isSw) "${listing.viewsCount} watazamaji" else "${listing.viewsCount} views",
+                                            style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold),
+                                            color = SokoNeonBlue
+                                        )
+                                    }
+
+                                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                        OutlinedButton(
+                                            onClick = { editingListing = listing },
+                                            shape = RoundedCornerShape(6.dp),
+                                            border = androidx.compose.foundation.BorderStroke(1.dp, SokoNeonBlue),
+                                            colors = ButtonDefaults.outlinedButtonColors(containerColor = SokoMidnightBlue),
+                                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                                            modifier = Modifier.height(32.dp).testTag("edit_listing_button_${listing.id}")
+                                        ) {
+                                            Icon(Icons.Default.Edit, contentDescription = "Edit", tint = SokoNeonBlue, modifier = Modifier.size(14.dp))
+                                            Spacer(modifier = Modifier.width(4.dp))
+                                            Text(if (isSw) "Hariri" else "Edit", color = SokoNeonBlue, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                        }
+
+                                        OutlinedButton(
+                                            onClick = { listingToDelete = listing },
+                                            shape = RoundedCornerShape(6.dp),
+                                            border = androidx.compose.foundation.BorderStroke(1.dp, SokoError.copy(alpha = 0.6f)),
+                                            colors = ButtonDefaults.outlinedButtonColors(containerColor = SokoMidnightBlue),
+                                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                                            modifier = Modifier.height(32.dp)
+                                        ) {
+                                            Icon(Icons.Default.Delete, contentDescription = "Delete", tint = SokoError, modifier = Modifier.size(14.dp))
+                                            Spacer(modifier = Modifier.width(4.dp))
+                                            Text(if (isSw) "Futa" else "Delete", color = SokoError, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                        }
+                                    }
+                                }
+                            }
                         }
                     }
                 }
             }
 
             1 -> {
-                // Add New Listing Tab
+                // Add New Listing Tab (with Product Photo Capture & Upload!)
                 var listingTitle by remember { mutableStateOf("") }
                 var listingPrice by remember { mutableStateOf("") }
                 var listingCategory by remember { mutableStateOf("kilimo") }
                 var listingType by remember { mutableStateOf("PRODUCT") }
-                var listingCity by remember { mutableStateOf("Dar es Salaam") }
+                var listingCity by remember { mutableStateOf(userBusiness?.city ?: "Dar es Salaam") }
                 var listingDescription by remember { mutableStateOf("") }
+                var listingImageUrl by remember { mutableStateOf("") }
                 var isDraftingAi by remember { mutableStateOf(false) }
                 var isPublishing by remember { mutableStateOf(false) }
+
+                val photoPickerLauncher = rememberLauncherForActivityResult(
+                    contract = ActivityResultContracts.PickVisualMedia()
+                ) { uri: Uri? ->
+                    if (uri != null) {
+                        scope.launch(Dispatchers.IO) {
+                            val base64 = ImageUtils.uriToBase64(context, uri)
+                            if (base64 != null) {
+                                listingImageUrl = base64
+                            }
+                        }
+                    }
+                }
+
+                val cameraLauncher = rememberLauncherForActivityResult(
+                    contract = ActivityResultContracts.TakePicturePreview()
+                ) { bitmap: Bitmap? ->
+                    if (bitmap != null) {
+                        val base64 = ImageUtils.bitmapToBase64(bitmap)
+                        listingImageUrl = base64
+                    }
+                }
 
                 Column(
                     modifier = Modifier
@@ -366,6 +495,92 @@ fun BusinessHubScreen(
                         }
                     }
 
+                    // Product Photo Picker & Camera Section
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(containerColor = SokoCardSurface),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Column(modifier = Modifier.padding(14.dp)) {
+                            Text(
+                                text = if (isSw) "Picha ya Bidhaa / Huduma" else "Product / Service Photo",
+                                style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                                color = SokoLightText
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = if (isSw) "Weka picha halisi kuvutia wateja zaidi." else "Add a real photo to attract more buyers.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = SokoMutedText
+                            )
+                            Spacer(modifier = Modifier.height(10.dp))
+
+                            if (listingImageUrl.isNotBlank()) {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(160.dp)
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .border(1.dp, SokoNeonBlue, RoundedCornerShape(8.dp))
+                                ) {
+                                    AsyncImage(
+                                        model = listingImageUrl,
+                                        contentDescription = "Preview",
+                                        contentScale = ContentScale.Crop,
+                                        modifier = Modifier.fillMaxSize()
+                                    )
+                                    IconButton(
+                                        onClick = { listingImageUrl = "" },
+                                        modifier = Modifier
+                                            .align(Alignment.TopEnd)
+                                            .padding(6.dp)
+                                            .size(28.dp)
+                                            .clip(CircleShape)
+                                            .background(SokoBlueBlack.copy(alpha = 0.8f))
+                                    ) {
+                                        Icon(Icons.Default.Delete, contentDescription = "Remove", tint = SokoError, modifier = Modifier.size(16.dp))
+                                    }
+                                }
+                                Spacer(modifier = Modifier.height(10.dp))
+                            }
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                OutlinedButton(
+                                    onClick = {
+                                        photoPickerLauncher.launch(
+                                            PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                                        )
+                                    },
+                                    modifier = Modifier.weight(1f),
+                                    shape = RoundedCornerShape(8.dp),
+                                    border = androidx.compose.foundation.BorderStroke(1.dp, SokoNeonBlue),
+                                    colors = ButtonDefaults.outlinedButtonColors(containerColor = SokoMidnightBlue),
+                                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp)
+                                ) {
+                                    Icon(Icons.Default.Image, contentDescription = null, tint = SokoNeonBlue, modifier = Modifier.size(16.dp))
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text(if (isSw) "Kivinjari / Galari" else "Pick Image", color = SokoNeonBlue, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                }
+
+                                OutlinedButton(
+                                    onClick = { cameraLauncher.launch(null) },
+                                    modifier = Modifier.weight(1f),
+                                    shape = RoundedCornerShape(8.dp),
+                                    border = androidx.compose.foundation.BorderStroke(1.dp, SokoNeonViolet),
+                                    colors = ButtonDefaults.outlinedButtonColors(containerColor = SokoMidnightBlue),
+                                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp)
+                                ) {
+                                    Icon(Icons.Default.CameraAlt, contentDescription = null, tint = SokoNeonViolet, modifier = Modifier.size(16.dp))
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text(if (isSw) "Piga Picha" else "Camera", color = SokoNeonViolet, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                }
+                            }
+                        }
+                    }
+
                     // Title
                     OutlinedTextField(
                         value = listingTitle,
@@ -412,7 +627,7 @@ fun BusinessHubScreen(
                         )
                     )
 
-                    // Gemini AI description draft helper trigger
+                    // sokoTZ AI description draft helper trigger
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -429,9 +644,9 @@ fun BusinessHubScreen(
                                         val prompt = "Nisaidie kutunga maelezo mafupi ya kuvutia ya tangazo la SokoTZ la bidhaa hii: '$listingTitle' yenye bei ya TZS $listingPrice katika mji wa $listingCity. Andika maelezo ya ubora na kuwasiliana kwa simu/WhatsApp."
                                         val draft = GeminiClient.chat(emptyList(), prompt)
                                         listingDescription = draft
-                                        Toast.makeText(context, if (isSw) "Gemini imetunga maelezo ya tangazo!" else "Draft generated by Gemini!", Toast.LENGTH_SHORT).show()
+                                        Toast.makeText(context, if (isSw) "sokoTZ Msaidizi ametunga maelezo ya tangazo!" else "Draft generated by sokoTZ AI!", Toast.LENGTH_SHORT).show()
                                     } catch (e: Exception) {
-                                        Toast.makeText(context, "AI error: ${e.message}", Toast.LENGTH_SHORT).show()
+                                        Toast.makeText(context, "AI info: ${e.message}", Toast.LENGTH_SHORT).show()
                                     } finally {
                                         isDraftingAi = false
                                     }
@@ -448,9 +663,9 @@ fun BusinessHubScreen(
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
                             text = if (isDraftingAi)
-                                (if (isSw) "Gemini inatunga maelezo..." else "Gemini is generating copy...")
+                                (if (isSw) "sokoTZ Msaidizi anatunga maelezo..." else "sokoTZ AI is generating copy...")
                             else
-                                (if (isSw) "Tunga maelezo kwa Gemini AI" else "Auto-draft description using Gemini AI"),
+                                (if (isSw) "Tunga maelezo kwa sokoTZ Msaidizi" else "Auto-draft description using sokoTZ AI"),
                             style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold),
                             color = SokoNeonViolet
                         )
@@ -494,7 +709,8 @@ fun BusinessHubScreen(
                                     type = listingType,
                                     city = listingCity,
                                     phoneNumber = userBusiness?.phoneNumber ?: (currentUser?.phoneNumber ?: "+255"),
-                                    whatsappNumber = userBusiness?.whatsappNumber ?: (currentUser?.phoneNumber ?: "+255")
+                                    whatsappNumber = userBusiness?.whatsappNumber ?: (currentUser?.phoneNumber ?: "+255"),
+                                    imageUrl = listingImageUrl
                                 )
                                 isPublishing = false
                                 if (result.isSuccess) {
@@ -527,15 +743,27 @@ fun BusinessHubScreen(
             }
 
             2 -> {
-                // Onboard Business Profile Tab
-                var bizName by remember { mutableStateOf("") }
-                var bizCategory by remember { mutableStateOf("elektroniki") }
-                var bizCity by remember { mutableStateOf("Dar es Salaam") }
-                var bizDistrict by remember { mutableStateOf("Ilala") }
-                var bizPhone by remember { mutableStateOf("+255") }
-                var bizWhatsapp by remember { mutableStateOf("+255") }
-                var bizDescription by remember { mutableStateOf("") }
+                // Onboard or Edit Business Profile Tab
+                var bizName by remember { mutableStateOf(userBusiness?.name ?: "") }
+                var bizCategory by remember { mutableStateOf(userBusiness?.categorySlug ?: "elektroniki") }
+                var bizCity by remember { mutableStateOf(userBusiness?.city ?: "Dar es Salaam") }
+                var bizDistrict by remember { mutableStateOf(userBusiness?.district ?: "Ilala") }
+                var bizPhone by remember { mutableStateOf(userBusiness?.phoneNumber ?: "+255") }
+                var bizWhatsapp by remember { mutableStateOf(userBusiness?.whatsappNumber ?: "+255") }
+                var bizDescription by remember { mutableStateOf(userBusiness?.descriptionSw ?: "") }
                 var isSubmittingBiz by remember { mutableStateOf(false) }
+
+                LaunchedEffect(userBusiness) {
+                    userBusiness?.let {
+                        bizName = it.name
+                        bizCategory = it.categorySlug
+                        bizCity = it.city
+                        bizDistrict = it.district
+                        bizPhone = it.phoneNumber
+                        bizWhatsapp = it.whatsappNumber
+                        bizDescription = it.descriptionSw
+                    }
+                }
 
                 Column(
                     modifier = Modifier
@@ -545,7 +773,10 @@ fun BusinessHubScreen(
                     verticalArrangement = Arrangement.spacedBy(14.dp)
                 ) {
                     Text(
-                        text = if (isSw) "Sajili Biashara Yako kwenye SokoTZ" else "Register Your Business on SokoTZ",
+                        text = if (userBusiness != null)
+                            (if (isSw) "Hariri Taarifa za Biashara Yako" else "Edit Your Business Profile")
+                        else
+                            (if (isSw) "Sajili Biashara Yako kwenye SokoTZ" else "Register Your Business on SokoTZ"),
                         style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
                         color = SokoLightText
                     )
@@ -646,19 +877,39 @@ fun BusinessHubScreen(
                             }
                             isSubmittingBiz = true
                             scope.launch {
-                                val result = repository.registerBusinessProfile(
-                                    name = bizName,
-                                    categorySlug = bizCategory,
-                                    city = bizCity,
-                                    district = bizDistrict,
-                                    phoneNumber = bizPhone,
-                                    whatsappNumber = bizWhatsapp,
-                                    description = bizDescription
-                                )
+                                val result = if (userBusiness != null) {
+                                    repository.updateBusinessProfile(
+                                        businessId = userBusiness.id,
+                                        name = bizName,
+                                        categorySlug = bizCategory,
+                                        city = bizCity,
+                                        district = bizDistrict,
+                                        phoneNumber = bizPhone,
+                                        whatsappNumber = bizWhatsapp,
+                                        description = bizDescription
+                                    )
+                                } else {
+                                    repository.registerBusinessProfile(
+                                        name = bizName,
+                                        categorySlug = bizCategory,
+                                        city = bizCity,
+                                        district = bizDistrict,
+                                        phoneNumber = bizPhone,
+                                        whatsappNumber = bizWhatsapp,
+                                        description = bizDescription
+                                    )
+                                }
                                 isSubmittingBiz = false
                                 if (result.isSuccess) {
                                     authManager.updateUserRole("BUSINESS_OWNER")
-                                    Toast.makeText(context, if (isSw) "Biashara imesajiliwa kwenye Firestore!" else "Business registered in Firestore!", Toast.LENGTH_SHORT).show()
+                                    Toast.makeText(
+                                        context,
+                                        if (userBusiness != null)
+                                            (if (isSw) "Taarifa za biashara zimesasishwa!" else "Business updated successfully!")
+                                        else
+                                            (if (isSw) "Biashara imesajiliwa kwenye Firestore!" else "Business registered in Firestore!"),
+                                        Toast.LENGTH_SHORT
+                                    ).show()
                                     currentTab = 0
                                 } else {
                                     Toast.makeText(context, "Hitilafu: ${result.exceptionOrNull()?.message}", Toast.LENGTH_LONG).show()
@@ -677,7 +928,10 @@ fun BusinessHubScreen(
                             CircularProgressIndicator(modifier = Modifier.size(20.dp), color = SokoLightText, strokeWidth = 2.dp)
                         } else {
                             Text(
-                                text = if (isSw) "Hifadhi Biashara kwenye Firestore" else "Save Business to Firestore",
+                                text = if (userBusiness != null)
+                                    (if (isSw) "Hifadhi Mabadiliko ya Biashara" else "Update Business in Firestore")
+                                else
+                                    (if (isSw) "Hifadhi Biashara kwenye Firestore" else "Save Business to Firestore"),
                                 color = SokoLightText,
                                 fontWeight = FontWeight.ExtraBold
                             )
@@ -687,6 +941,250 @@ fun BusinessHubScreen(
             }
         }
     }
+
+    // Edit Listing Dialog
+    editingListing?.let { listing ->
+        EditListingDialog(
+            listing = listing,
+            isSw = isSw,
+            onDismiss = { editingListing = null },
+            onSave = { updatedTitle, updatedPrice, updatedDesc, updatedCity, updatedType, updatedImage ->
+                scope.launch {
+                    val result = repository.updateListing(
+                        listingId = listing.id,
+                        title = updatedTitle,
+                        priceTzs = updatedPrice,
+                        categorySlug = listing.categorySlug,
+                        description = updatedDesc,
+                        type = updatedType,
+                        city = updatedCity,
+                        phoneNumber = listing.phoneNumber,
+                        whatsappNumber = listing.whatsappNumber,
+                        imageUrl = updatedImage
+                    )
+                    if (result.isSuccess) {
+                        Toast.makeText(context, if (isSw) "Tangazo limesasishwa!" else "Listing updated successfully!", Toast.LENGTH_SHORT).show()
+                        editingListing = null
+                    } else {
+                        Toast.makeText(context, "Hitilafu: ${result.exceptionOrNull()?.message}", Toast.LENGTH_LONG).show()
+                    }
+                }
+            }
+        )
+    }
+
+    // Delete Confirmation Dialog
+    listingToDelete?.let { listing ->
+        AlertDialog(
+            onDismissRequest = { listingToDelete = null },
+            title = { Text(if (isSw) "Kufuta Tangazo" else "Delete Listing", color = SokoLightText, fontWeight = FontWeight.Bold) },
+            text = {
+                Text(
+                    text = if (isSw) "Je, una uhakika unataka kufuta tangazo '${listing.titleSw}'? Halitaonekana tena kwenye SokoTZ."
+                    else "Are you sure you want to delete '${listing.titleSw}'? It will no longer appear on SokoTZ.",
+                    color = SokoMutedText
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        val toDeleteId = listing.id
+                        listingToDelete = null
+                        scope.launch {
+                            val res = repository.deleteListing(toDeleteId)
+                            if (res.isSuccess) {
+                                Toast.makeText(context, if (isSw) "Tangazo limefutwa" else "Listing deleted", Toast.LENGTH_SHORT).show()
+                            } else {
+                                Toast.makeText(context, "Hitilafu: ${res.exceptionOrNull()?.message}", Toast.LENGTH_SHORT).show()
+                            }
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = SokoError)
+                ) {
+                    Text(if (isSw) "Futa Kabisa" else "Delete Permanently", color = SokoLightText, fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { listingToDelete = null }) {
+                    Text(if (isSw) "Ghairi" else "Cancel", color = SokoMutedText)
+                }
+            },
+            containerColor = SokoCardSurface
+        )
+    }
+}
+
+@Composable
+fun EditListingDialog(
+    listing: Listing,
+    isSw: Boolean,
+    onDismiss: () -> Unit,
+    onSave: (title: String, price: Long, desc: String, city: String, type: String, image: String) -> Unit
+) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var editTitle by remember { mutableStateOf(listing.titleSw) }
+    var editPrice by remember { mutableStateOf(listing.priceTzs.toString()) }
+    var editCity by remember { mutableStateOf(listing.city) }
+    var editType by remember { mutableStateOf(listing.type) }
+    var editDescription by remember { mutableStateOf(listing.descriptionSw) }
+    var editImageUrl by remember { mutableStateOf(listing.imageUrl) }
+    var isSaving by remember { mutableStateOf(false) }
+
+    val photoPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickVisualMedia()
+    ) { uri: Uri? ->
+        if (uri != null) {
+            scope.launch(Dispatchers.IO) {
+                val base64 = ImageUtils.uriToBase64(context, uri)
+                if (base64 != null) {
+                    editImageUrl = base64
+                }
+            }
+        }
+    }
+
+    val cameraLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.TakePicturePreview()
+    ) { bitmap: Bitmap? ->
+        if (bitmap != null) {
+            val base64 = ImageUtils.bitmapToBase64(bitmap)
+            editImageUrl = base64
+        }
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text(
+                text = if (isSw) "Hariri Tangazo Lako" else "Edit Your Listing",
+                color = SokoLightText,
+                fontWeight = FontWeight.Bold,
+                fontSize = 18.sp
+            )
+        },
+        text = {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                // Photo preview & upload in edit mode
+                if (editImageUrl.isNotBlank()) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(130.dp)
+                            .clip(RoundedCornerShape(8.dp))
+                            .border(1.dp, SokoNeonBlue, RoundedCornerShape(8.dp))
+                    ) {
+                        AsyncImage(
+                            model = editImageUrl,
+                            contentDescription = "Edit photo",
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.fillMaxSize()
+                        )
+                        IconButton(
+                            onClick = { editImageUrl = "" },
+                            modifier = Modifier
+                                .align(Alignment.TopEnd)
+                                .padding(4.dp)
+                                .size(26.dp)
+                                .clip(CircleShape)
+                                .background(SokoBlueBlack.copy(alpha = 0.8f))
+                        ) {
+                            Icon(Icons.Default.Delete, contentDescription = "Remove", tint = SokoError, modifier = Modifier.size(16.dp))
+                        }
+                    }
+                }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    OutlinedButton(
+                        onClick = {
+                            photoPickerLauncher.launch(
+                                PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                            )
+                        },
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(6.dp),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, SokoNeonBlue),
+                        contentPadding = PaddingValues(horizontal = 6.dp, vertical = 4.dp)
+                    ) {
+                        Icon(Icons.Default.Image, contentDescription = null, tint = SokoNeonBlue, modifier = Modifier.size(14.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(if (isSw) "Badilisha Picha" else "Pick Photo", color = SokoNeonBlue, fontSize = 10.sp)
+                    }
+
+                    OutlinedButton(
+                        onClick = { cameraLauncher.launch(null) },
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(6.dp),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, SokoNeonViolet),
+                        contentPadding = PaddingValues(horizontal = 6.dp, vertical = 4.dp)
+                    ) {
+                        Icon(Icons.Default.CameraAlt, contentDescription = null, tint = SokoNeonViolet, modifier = Modifier.size(14.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(if (isSw) "Piga Picha" else "Camera", color = SokoNeonViolet, fontSize = 10.sp)
+                    }
+                }
+
+                OutlinedTextField(
+                    value = editTitle,
+                    onValueChange = { editTitle = it },
+                    label = { Text(if (isSw) "Jina la Bidhaa" else "Title") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true
+                )
+
+                OutlinedTextField(
+                    value = editPrice,
+                    onValueChange = { editPrice = it.filter { c -> c.isDigit() } },
+                    label = { Text(if (isSw) "Bei (TZS)" else "Price (TZS)") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true
+                )
+
+                OutlinedTextField(
+                    value = editCity,
+                    onValueChange = { editCity = it },
+                    label = { Text(if (isSw) "Mji / Mkoa" else "City") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true
+                )
+
+                OutlinedTextField(
+                    value = editDescription,
+                    onValueChange = { editDescription = it },
+                    label = { Text(if (isSw) "Maelezo" else "Description") },
+                    modifier = Modifier.fillMaxWidth(),
+                    minLines = 3
+                )
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    val priceLong = editPrice.toLongOrNull() ?: listing.priceTzs
+                    isSaving = true
+                    onSave(editTitle, priceLong, editDescription, editCity, editType, editImageUrl)
+                },
+                enabled = !isSaving && editTitle.isNotBlank(),
+                colors = ButtonDefaults.buttonColors(containerColor = SokoNeonBlue)
+            ) {
+                Text(if (isSw) "Hifadhi Mabadiliko" else "Save Changes", color = SokoBlueBlack, fontWeight = FontWeight.Bold)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(if (isSw) "Ghairi" else "Cancel", color = SokoMutedText)
+            }
+        },
+        containerColor = SokoCardSurface
+    )
 }
 
 @Composable

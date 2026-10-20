@@ -196,12 +196,12 @@ fun DiscoverScreen(
                             Spacer(modifier = Modifier.width(12.dp))
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(
-                                    text = if (isSw) "sokoTZ AI (Msaidizi wa SokoTZ)" else "sokoTZ AI (SokoTZ Assistant)",
+                                    text = if (isSw) "sokoTZ Msaidizi" else "sokoTZ AI",
                                     style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                                     color = SokoLightText
                                 )
                                 Text(
-                                    text = if (isSw) "Ongea na Gemini AI kwa Kiswahili au Kiingereza" else "Multi-turn Gemini AI chat for Tanzanian business discovery",
+                                    text = if (isSw) "Ongea na sokoTZ Msaidizi kwa Kiswahili au Kiingereza" else "Intelligent sokoTZ AI chat for Tanzanian business discovery",
                                     style = MaterialTheme.typography.bodySmall,
                                     color = SokoMutedText
                                 )

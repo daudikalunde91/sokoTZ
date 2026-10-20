@@ -123,22 +123,32 @@ object GeminiClient {
                 )
             )
 
-            // Try primary model: gemini-flash-latest, fallback: gemini-2.5-flash
-            val modelsToTry = listOf("gemini-flash-latest", "gemini-2.5-flash")
+            // Prioritize stable gemini-2.5-flash, then gemini-3.1-flash-lite-preview, then gemini-flash-latest
+            val modelsToTry = listOf("gemini-2.5-flash", "gemini-3.1-flash-lite-preview", "gemini-flash-latest")
             for (model in modelsToTry) {
-                try {
-                    val response = api.generateContent(model = model, apiKey = apiKey, request = request)
-                    val reply = response.candidates?.firstOrNull()?.content?.parts?.firstOrNull()?.text
-                    if (!reply.isNullOrBlank()) {
-                        return@withContext reply
+                var attempts = 0
+                while (attempts < 2) {
+                    attempts++
+                    try {
+                        val response = api.generateContent(model = model, apiKey = apiKey, request = request)
+                        val reply = response.candidates?.firstOrNull()?.content?.parts?.firstOrNull()?.text
+                        if (!reply.isNullOrBlank()) {
+                            return@withContext reply
+                        }
+                    } catch (e: Exception) {
+                        Log.w("GeminiService", "Attempt $attempts with $model failed: ${e.message}")
+                        // If 503 Service Unavailable or 429 Too Many Requests, short delay before next try
+                        if (e.message?.contains("503") == true || e.message?.contains("429") == true) {
+                            kotlinx.coroutines.delay(400)
+                        } else {
+                            break // non-retryable for this model, try next model
+                        }
                     }
-                } catch (e: Exception) {
-                    Log.w("GeminiService", "Attempt with $model failed: ${e.message}")
                 }
             }
         }
 
-        // Resilient Fallback Assistant Generator (handles offline, 503, or unconfigured keys)
+        // Resilient Fallback: Always returns an intelligent, structured response even if remote API returns 503
         generateLocalAssistantResponse(trimmed, marketplaceContext)
     }
 

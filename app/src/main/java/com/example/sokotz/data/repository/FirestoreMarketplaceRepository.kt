@@ -58,15 +58,22 @@ class FirestoreMarketplaceRepository(
     private val _language = MutableStateFlow(AppLanguage.SW)
     val language: StateFlow<AppLanguage> = _language.asStateFlow()
 
-    private val _assistantMessages = MutableStateFlow<List<AssistantMessage>>(
-        listOf(
-            AssistantMessage(
-                id = "msg_init",
-                isUser = false,
-                text = "Habari! Karibu sokoTZ AI (Msaidizi wa SokoTZ). Naweza kukusaidia kupata biashara na bidhaa halisi Tanzania, au kukusaidia kuandika maelezo ya tangazo lako."
-            )
+    private val userConversations = mutableMapOf<String, List<AssistantMessage>>()
+
+    private fun getWelcomeMessage(userName: String = ""): AssistantMessage {
+        val isSw = _language.value == AppLanguage.SW
+        val greeting = if (userName.isNotBlank()) " $userName" else ""
+        return AssistantMessage(
+            id = "msg_init_${System.currentTimeMillis()}",
+            isUser = false,
+            text = if (isSw)
+                "Habari$greeting! Mimi ni sokoTZ Msaidizi (sokoTZ AI). Nawezaje kukusaidia leo kupata bidhaa, wauzaji, au kutunga maelezo ya tangazo lako?"
+            else
+                "Hello$greeting! I am sokoTZ AI (sokoTZ Assistant). How can I assist you today with products, verified Tanzanian businesses, or drafting ad descriptions?"
         )
-    )
+    }
+
+    private val _assistantMessages = MutableStateFlow<List<AssistantMessage>>(listOf(getWelcomeMessage()))
     val assistantMessages: StateFlow<List<AssistantMessage>> = _assistantMessages.asStateFlow()
 
     private val _isAssistantThinking = MutableStateFlow(false)
@@ -74,9 +81,24 @@ class FirestoreMarketplaceRepository(
 
     private var businessesListener: ListenerRegistration? = null
     private var listingsListener: ListenerRegistration? = null
+    private var activeUserId: String? = auth.currentUser?.uid
 
     private val authStateListener = FirebaseAuth.AuthStateListener { firebaseAuth ->
         val user = firebaseAuth.currentUser
+        val newUid = user?.uid
+        if (newUid != activeUserId) {
+            // Save previous user conversation
+            activeUserId?.let { uid ->
+                userConversations[uid] = _assistantMessages.value
+            }
+            activeUserId = newUid
+            // Load new user's conversation or fresh welcome message
+            if (newUid != null) {
+                _assistantMessages.value = userConversations[newUid] ?: listOf(getWelcomeMessage(user.displayName ?: ""))
+            } else {
+                _assistantMessages.value = listOf(getWelcomeMessage())
+            }
+        }
         if (user != null) {
             startRealtimeListeners()
         } else {
@@ -263,7 +285,8 @@ class FirestoreMarketplaceRepository(
         type: String,
         city: String,
         phoneNumber: String,
-        whatsappNumber: String
+        whatsappNumber: String,
+        imageUrl: String = ""
     ): Result<String> {
         val currentUserId = try {
             requireUserId()
@@ -287,6 +310,8 @@ class FirestoreMarketplaceRepository(
             "status" to "PUBLISHED",
             "city" to city.trim(),
             "isFeatured" to false,
+            "imageUrl" to imageUrl.trim(),
+            "viewsCount" to 0L,
             "phoneNumber" to phoneNumber.trim(),
             "whatsappNumber" to whatsappNumber.trim(),
             "createdAt" to FieldValue.serverTimestamp(),
@@ -299,6 +324,120 @@ class FirestoreMarketplaceRepository(
         } catch (e: Exception) {
             handleFirestoreError(e, OperationType.CREATE, docRef.path)
             Result.failure(e)
+        }
+    }
+
+    suspend fun updateListing(
+        listingId: String,
+        title: String,
+        priceTzs: Long,
+        categorySlug: String,
+        description: String,
+        type: String,
+        city: String,
+        phoneNumber: String,
+        whatsappNumber: String,
+        imageUrl: String = ""
+    ): Result<Unit> {
+        try {
+            requireUserId()
+        } catch (e: Exception) {
+            return Result.failure(e)
+        }
+
+        val docRef = db.collection("listings").document(listingId)
+        val updates = hashMapOf<String, Any>(
+            "titleSw" to title.trim(),
+            "titleEn" to title.trim(),
+            "priceTzs" to priceTzs,
+            "categorySlug" to categorySlug,
+            "descriptionSw" to description.trim(),
+            "descriptionEn" to description.trim(),
+            "type" to type,
+            "city" to city.trim(),
+            "phoneNumber" to phoneNumber.trim(),
+            "whatsappNumber" to whatsappNumber.trim(),
+            "imageUrl" to imageUrl.trim(),
+            "updatedAt" to FieldValue.serverTimestamp()
+        )
+
+        return try {
+            docRef.update(updates).await()
+            Result.success(Unit)
+        } catch (e: Exception) {
+            handleFirestoreError(e, OperationType.UPDATE, docRef.path)
+            Result.failure(e)
+        }
+    }
+
+    suspend fun deleteListing(listingId: String): Result<Unit> {
+        try {
+            requireUserId()
+        } catch (e: Exception) {
+            return Result.failure(e)
+        }
+        val docRef = db.collection("listings").document(listingId)
+        return try {
+            docRef.delete().await()
+            Result.success(Unit)
+        } catch (e: Exception) {
+            handleFirestoreError(e, OperationType.DELETE, docRef.path)
+            Result.failure(e)
+        }
+    }
+
+    suspend fun updateBusinessProfile(
+        businessId: String,
+        name: String,
+        categorySlug: String,
+        city: String,
+        district: String,
+        phoneNumber: String,
+        whatsappNumber: String,
+        description: String
+    ): Result<Unit> {
+        try {
+            requireUserId()
+        } catch (e: Exception) {
+            return Result.failure(e)
+        }
+
+        val categoryName = _categories.value.firstOrNull { it.slug == categorySlug }?.nameSw ?: "Biashara"
+        val docRef = db.collection("businesses").document(businessId)
+        val updates = hashMapOf<String, Any>(
+            "name" to name.trim(),
+            "categorySlug" to categorySlug,
+            "categoryName" to categoryName,
+            "city" to city.trim(),
+            "district" to district.trim(),
+            "phoneNumber" to phoneNumber.trim(),
+            "whatsappNumber" to whatsappNumber.trim(),
+            "descriptionSw" to description.trim(),
+            "descriptionEn" to description.trim(),
+            "address" to "$district, $city",
+            "updatedAt" to FieldValue.serverTimestamp()
+        )
+
+        return try {
+            docRef.update(updates).await()
+            Result.success(Unit)
+        } catch (e: Exception) {
+            handleFirestoreError(e, OperationType.UPDATE, docRef.path)
+            Result.failure(e)
+        }
+    }
+
+    suspend fun incrementListingView(listingId: String) {
+        if (auth.currentUser == null) return
+        try {
+            db.collection("listings").document(listingId).update(
+                mapOf(
+                    "viewsCount" to FieldValue.increment(1),
+                    "updatedAt" to FieldValue.serverTimestamp()
+                )
+            ).await()
+        } catch (e: Exception) {
+            Log.w("FirestoreRepo", "Could not increment view count for $listingId", e)
         }
     }
 
@@ -358,15 +497,22 @@ class FirestoreMarketplaceRepository(
                     isAiDraft = isDraft
                 )
 
-                _assistantMessages.value = _assistantMessages.value + assistantMsg
+                val updated = _assistantMessages.value + assistantMsg
+                _assistantMessages.value = updated
+                activeUserId?.let { uid -> userConversations[uid] = updated }
             } catch (e: Exception) {
                 Log.e("FirestoreRepo", "Assistant error", e)
                 val errorMsg = AssistantMessage(
                     id = "asst_err_${UUID.randomUUID()}",
                     isUser = false,
-                    text = "Samahani, kumekuwa na changamoto ya mtandao kufikia Gemini AI. Tafadhali jaribu tena."
+                    text = if (_language.value == AppLanguage.SW)
+                        "Samahani, kumekuwa na changamoto ya mtandao kufikia sokoTZ Msaidizi. Tafadhali jaribu tena baada ya muda mfupi."
+                    else
+                        "Sorry, there was a temporary network issue connecting to sokoTZ AI. Please try again shortly."
                 )
-                _assistantMessages.value = _assistantMessages.value + errorMsg
+                val updated = _assistantMessages.value + errorMsg
+                _assistantMessages.value = updated
+                activeUserId?.let { uid -> userConversations[uid] = updated }
             } finally {
                 _isAssistantThinking.value = false
             }
@@ -374,17 +520,10 @@ class FirestoreMarketplaceRepository(
     }
 
     fun clearAssistantConversation() {
-        val isSw = _language.value == AppLanguage.SW
-        _assistantMessages.value = listOf(
-            AssistantMessage(
-                id = "msg_${System.currentTimeMillis()}",
-                isUser = false,
-                text = if (isSw)
-                    "Mazungumzo mapya yameanza. Nawezaje kukusaidia kwenye SokoTZ leo?"
-                else
-                    "New conversation started. How may I assist you with SokoTZ marketplace today?"
-            )
-        )
+        val welcome = getWelcomeMessage(auth.currentUser?.displayName ?: "")
+        val freshList = listOf(welcome)
+        _assistantMessages.value = freshList
+        activeUserId?.let { uid -> userConversations[uid] = freshList }
     }
 
     companion object {

@@ -63,6 +63,7 @@ import com.example.sokotz.data.model.ListingType
 import com.example.sokotz.data.util.ImageUtils
 import com.example.ui.theme.SokoBlueBlack
 import com.example.ui.theme.SokoCardBorder
+import com.example.ui.theme.SokoColors
 import com.example.ui.theme.SokoCardSurface
 import com.example.ui.theme.SokoDeepNavy
 import com.example.ui.theme.SokoElectricBlue
@@ -85,7 +86,7 @@ fun SokoTzHeader(
     modifier: Modifier = Modifier
 ) {
     Surface(
-        color = SokoMidnightBlue,
+        color = SokoColors.headerSurface,
         modifier = modifier
             .fillMaxWidth()
             .statusBarsPadding()

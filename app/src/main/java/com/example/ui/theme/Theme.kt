@@ -84,6 +84,45 @@ private val SokoLightColorScheme = lightColorScheme(
     onError = Color.White
 )
 
+object SokoColors {
+    val isDark: Boolean
+        @Composable get() = LocalIsDarkTheme.current
+
+    val background: Color
+        @Composable get() = MaterialTheme.colorScheme.background
+
+    val surface: Color
+        @Composable get() = MaterialTheme.colorScheme.surface
+
+    val cardSurface: Color
+        @Composable get() = if (isDark) SokoCardSurface else Color.White
+
+    val cardBorder: Color
+        @Composable get() = if (isDark) SokoCardBorder else Color(0xFFE2E8F0)
+
+    val headerSurface: Color
+        @Composable get() = if (isDark) SokoMidnightBlue else Color(0xFF0F172A)
+
+    val navBarSurface: Color
+        @Composable get() = if (isDark) SokoMidnightBlue else Color.White
+
+    val textPrimary: Color
+        @Composable get() = if (isDark) SokoLightText else Color(0xFF0F172A)
+
+    val textMuted: Color
+        @Composable get() = if (isDark) SokoMutedText else Color(0xFF64748B)
+
+    val inputBackground: Color
+        @Composable get() = if (isDark) SokoDeepNavy else Color(0xFFF1F5F9)
+
+    val heroGradient: Brush
+        @Composable get() = if (isDark) {
+            Brush.verticalGradient(listOf(SokoMidnightBlue, SokoDeepNavy, SokoBlueBlack))
+        } else {
+            Brush.verticalGradient(listOf(Color(0xFFE0F2FE), Color(0xFFF1F5F9), Color(0xFFF8FAFC)))
+        }
+}
+
 object SokoGradients {
     val HeroGradient = Brush.verticalGradient(
         colors = listOf(

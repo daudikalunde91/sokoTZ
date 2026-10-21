@@ -59,6 +59,7 @@ import com.example.sokotz.ui.screens.search.SearchScreen
 import com.example.ui.theme.SokoBlueBlack
 import androidx.activity.compose.BackHandler
 import com.example.ui.theme.SokoCardBorder
+import com.example.ui.theme.SokoColors
 import com.example.ui.theme.SokoDeepNavy
 import com.example.ui.theme.SokoLightText
 import com.example.ui.theme.SokoMidnightBlue
@@ -146,7 +147,7 @@ fun SokoTzApp() {
         Scaffold(
             modifier = Modifier
                 .fillMaxSize()
-                .background(SokoBlueBlack),
+                .background(SokoColors.background),
         topBar = {
             if (currentScreen is Screen.Discover || currentScreen is Screen.Search ||
                 currentScreen is Screen.Assistant || currentScreen is Screen.BusinessHub ||
@@ -160,11 +161,11 @@ fun SokoTzApp() {
         },
         bottomBar = {
             NavigationBar(
-                containerColor = SokoMidnightBlue,
-                contentColor = SokoLightText,
+                containerColor = SokoColors.navBarSurface,
+                contentColor = SokoColors.textPrimary,
                 modifier = Modifier
                     .clip(RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp))
-                    .border(1.dp, SokoCardBorder, RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp)),
+                    .border(1.dp, SokoColors.cardBorder, RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp)),
                 windowInsets = WindowInsets.navigationBars
             ) {
                 BottomNavTab.values().forEach { tab ->
@@ -186,13 +187,14 @@ fun SokoTzApp() {
                                 BottomNavTab.ASSISTANT -> Screen.Assistant
                                 BottomNavTab.BUSINESS -> Screen.BusinessHub
                                 BottomNavTab.ACCOUNT -> Screen.Account
+                                BottomNavTab.DISCOVER -> Screen.Discover
                             }
                         },
                         icon = {
                             Icon(
                                 imageVector = if (isSelected) tab.activeIcon else tab.inactiveIcon,
                                 contentDescription = if (isSw) tab.titleSw else tab.titleEn,
-                                tint = if (isSelected) SokoNeonBlue else SokoMutedText,
+                                tint = if (isSelected) SokoNeonBlue else SokoColors.textMuted,
                                 modifier = Modifier.size(22.dp)
                             )
                         },
@@ -202,13 +204,13 @@ fun SokoTzApp() {
                                 fontSize = 10.sp,
                                 maxLines = 1,
                                 fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                                color = if (isSelected) SokoNeonBlue else SokoMutedText
+                                color = if (isSelected) SokoNeonBlue else SokoColors.textMuted
                             )
                         },
                         colors = NavigationBarItemDefaults.colors(
-                            indicatorColor = SokoDeepNavy,
+                            indicatorColor = if (SokoColors.isDark) SokoDeepNavy else androidx.compose.ui.graphics.Color(0xFFE0F2FE),
                             selectedIconColor = SokoNeonBlue,
-                            unselectedIconColor = SokoMutedText
+                            unselectedIconColor = SokoColors.textMuted
                         ),
                         modifier = Modifier.testTag(tab.testTag)
                     )
@@ -220,7 +222,7 @@ fun SokoTzApp() {
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
-                .background(SokoBlueBlack)
+                .background(SokoColors.background)
         ) {
             when (val screen = currentScreen) {
                 is Screen.Discover -> {

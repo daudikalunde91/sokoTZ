@@ -75,6 +75,10 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import android.Manifest
+import android.content.pm.PackageManager
+import androidx.core.content.ContextCompat
+import kotlinx.coroutines.withContext
 import coil.compose.AsyncImage
 import com.example.sokotz.data.auth.AuthManager
 import com.example.sokotz.data.model.AppLanguage
@@ -83,6 +87,7 @@ import com.example.sokotz.data.remote.GeminiClient
 import com.example.sokotz.data.repository.FirestoreMarketplaceRepository
 import com.example.sokotz.data.util.ImageUtils
 import com.example.sokotz.ui.components.ListingCard
+import com.example.sokotz.ui.components.SokoListingImage
 import com.example.ui.theme.SokoBlueBlack
 import com.example.ui.theme.SokoCardBorder
 import com.example.ui.theme.SokoCardSurface
@@ -421,6 +426,7 @@ fun BusinessHubScreen(
                 var listingCity by remember { mutableStateOf(userBusiness?.city ?: "Dar es Salaam") }
                 var listingDescription by remember { mutableStateOf("") }
                 var listingImageUrl by remember { mutableStateOf("") }
+                var isProcessingImage by remember { mutableStateOf(false) }
                 var isDraftingAi by remember { mutableStateOf(false) }
                 var isPublishing by remember { mutableStateOf(false) }
 
@@ -428,10 +434,17 @@ fun BusinessHubScreen(
                     contract = ActivityResultContracts.PickVisualMedia()
                 ) { uri: Uri? ->
                     if (uri != null) {
+                        isProcessingImage = true
                         scope.launch(Dispatchers.IO) {
                             val base64 = ImageUtils.uriToBase64(context, uri)
-                            if (base64 != null) {
-                                listingImageUrl = base64
+                            withContext(Dispatchers.Main) {
+                                isProcessingImage = false
+                                if (base64 != null) {
+                                    listingImageUrl = base64
+                                    Toast.makeText(context, if (isSw) "Picha imewekwa kikamilifu!" else "Photo loaded successfully!", Toast.LENGTH_SHORT).show()
+                                } else {
+                                    Toast.makeText(context, if (isSw) "Hitilafu ya kusoma picha, tafadhali jaribu nyingine." else "Could not load image, please try another.", Toast.LENGTH_LONG).show()
+                                }
                             }
                         }
                     }
@@ -441,8 +454,29 @@ fun BusinessHubScreen(
                     contract = ActivityResultContracts.TakePicturePreview()
                 ) { bitmap: Bitmap? ->
                     if (bitmap != null) {
-                        val base64 = ImageUtils.bitmapToBase64(bitmap)
-                        listingImageUrl = base64
+                        isProcessingImage = true
+                        scope.launch(Dispatchers.IO) {
+                            val base64 = ImageUtils.bitmapToBase64(bitmap)
+                            withContext(Dispatchers.Main) {
+                                isProcessingImage = false
+                                listingImageUrl = base64
+                                Toast.makeText(context, if (isSw) "Picha imepigwa kikamilifu!" else "Photo captured successfully!", Toast.LENGTH_SHORT).show()
+                            }
+                        }
+                    }
+                }
+
+                val cameraPermissionLauncher = rememberLauncherForActivityResult(
+                    contract = ActivityResultContracts.RequestPermission()
+                ) { isGranted ->
+                    if (isGranted) {
+                        cameraLauncher.launch(null)
+                    } else {
+                        Toast.makeText(
+                            context,
+                            if (isSw) "Ruhusa ya kamera inahitajika kupiga picha ya bidhaa." else "Camera permission is required to capture product photo.",
+                            Toast.LENGTH_LONG
+                        ).show()
                     }
                 }
 
@@ -515,19 +549,39 @@ fun BusinessHubScreen(
                             )
                             Spacer(modifier = Modifier.height(10.dp))
 
+                            if (isProcessingImage) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .background(SokoMidnightBlue)
+                                        .padding(12.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    CircularProgressIndicator(modifier = Modifier.size(18.dp), color = SokoNeonBlue, strokeWidth = 2.dp)
+                                    Spacer(modifier = Modifier.width(10.dp))
+                                    Text(
+                                        text = if (isSw) "Inachakata picha ya bidhaa..." else "Processing product photo...",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = SokoNeonBlue
+                                    )
+                                }
+                                Spacer(modifier = Modifier.height(10.dp))
+                            }
+
                             if (listingImageUrl.isNotBlank()) {
                                 Box(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .height(160.dp)
+                                        .height(180.dp)
                                         .clip(RoundedCornerShape(8.dp))
                                         .border(1.dp, SokoNeonBlue, RoundedCornerShape(8.dp))
                                 ) {
-                                    AsyncImage(
-                                        model = listingImageUrl,
+                                    SokoListingImage(
+                                        imageUrl = listingImageUrl,
                                         contentDescription = "Preview",
-                                        contentScale = ContentScale.Crop,
-                                        modifier = Modifier.fillMaxSize()
+                                        modifier = Modifier.fillMaxSize(),
+                                        shape = RoundedCornerShape(8.dp)
                                     )
                                     IconButton(
                                         onClick = { listingImageUrl = "" },
@@ -566,7 +620,17 @@ fun BusinessHubScreen(
                                 }
 
                                 OutlinedButton(
-                                    onClick = { cameraLauncher.launch(null) },
+                                    onClick = {
+                                        val hasPermission = ContextCompat.checkSelfPermission(
+                                            context,
+                                            Manifest.permission.CAMERA
+                                        ) == PackageManager.PERMISSION_GRANTED
+                                        if (hasPermission) {
+                                            cameraLauncher.launch(null)
+                                        } else {
+                                            cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
+                                        }
+                                    },
                                     modifier = Modifier.weight(1f),
                                     shape = RoundedCornerShape(8.dp),
                                     border = androidx.compose.foundation.BorderStroke(1.dp, SokoNeonViolet),
@@ -1029,16 +1093,24 @@ fun EditListingDialog(
     var editType by remember { mutableStateOf(listing.type) }
     var editDescription by remember { mutableStateOf(listing.descriptionSw) }
     var editImageUrl by remember { mutableStateOf(listing.imageUrl) }
+    var isProcessingEditImage by remember { mutableStateOf(false) }
     var isSaving by remember { mutableStateOf(false) }
 
     val photoPickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickVisualMedia()
     ) { uri: Uri? ->
         if (uri != null) {
+            isProcessingEditImage = true
             scope.launch(Dispatchers.IO) {
                 val base64 = ImageUtils.uriToBase64(context, uri)
-                if (base64 != null) {
-                    editImageUrl = base64
+                withContext(Dispatchers.Main) {
+                    isProcessingEditImage = false
+                    if (base64 != null) {
+                        editImageUrl = base64
+                        Toast.makeText(context, if (isSw) "Picha imewekwa!" else "Photo loaded!", Toast.LENGTH_SHORT).show()
+                    } else {
+                        Toast.makeText(context, if (isSw) "Hitilafu ya kusoma picha!" else "Could not load image!", Toast.LENGTH_SHORT).show()
+                    }
                 }
             }
         }
@@ -1048,8 +1120,29 @@ fun EditListingDialog(
         contract = ActivityResultContracts.TakePicturePreview()
     ) { bitmap: Bitmap? ->
         if (bitmap != null) {
-            val base64 = ImageUtils.bitmapToBase64(bitmap)
-            editImageUrl = base64
+            isProcessingEditImage = true
+            scope.launch(Dispatchers.IO) {
+                val base64 = ImageUtils.bitmapToBase64(bitmap)
+                withContext(Dispatchers.Main) {
+                    isProcessingEditImage = false
+                    editImageUrl = base64
+                    Toast.makeText(context, if (isSw) "Picha imepigwa!" else "Photo captured!", Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
+    }
+
+    val cameraPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        if (isGranted) {
+            cameraLauncher.launch(null)
+        } else {
+            Toast.makeText(
+                context,
+                if (isSw) "Ruhusa ya kamera inahitajika kupiga picha." else "Camera permission is required to capture photo.",
+                Toast.LENGTH_LONG
+            ).show()
         }
     }
 
@@ -1070,20 +1163,39 @@ fun EditListingDialog(
                     .verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
+                if (isProcessingEditImage) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(SokoMidnightBlue)
+                            .padding(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        CircularProgressIndicator(modifier = Modifier.size(16.dp), color = SokoNeonBlue, strokeWidth = 2.dp)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = if (isSw) "Inachakata picha mpya..." else "Processing new photo...",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = SokoNeonBlue
+                        )
+                    }
+                }
+
                 // Photo preview & upload in edit mode
                 if (editImageUrl.isNotBlank()) {
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(130.dp)
+                            .height(150.dp)
                             .clip(RoundedCornerShape(8.dp))
                             .border(1.dp, SokoNeonBlue, RoundedCornerShape(8.dp))
                     ) {
-                        AsyncImage(
-                            model = editImageUrl,
+                        SokoListingImage(
+                            imageUrl = editImageUrl,
                             contentDescription = "Edit photo",
-                            contentScale = ContentScale.Crop,
-                            modifier = Modifier.fillMaxSize()
+                            modifier = Modifier.fillMaxSize(),
+                            shape = RoundedCornerShape(8.dp)
                         )
                         IconButton(
                             onClick = { editImageUrl = "" },
@@ -1120,7 +1232,17 @@ fun EditListingDialog(
                     }
 
                     OutlinedButton(
-                        onClick = { cameraLauncher.launch(null) },
+                        onClick = {
+                            val hasPermission = ContextCompat.checkSelfPermission(
+                                context,
+                                Manifest.permission.CAMERA
+                            ) == PackageManager.PERMISSION_GRANTED
+                            if (hasPermission) {
+                                cameraLauncher.launch(null)
+                            } else {
+                                cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
+                            }
+                        },
                         modifier = Modifier.weight(1f),
                         shape = RoundedCornerShape(6.dp),
                         border = androidx.compose.foundation.BorderStroke(1.dp, SokoNeonViolet),

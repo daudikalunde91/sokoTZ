@@ -50,6 +50,7 @@ import androidx.compose.ui.unit.sp
 import com.example.sokotz.data.model.AppLanguage
 import com.example.sokotz.data.repository.FirestoreMarketplaceRepository
 import com.example.sokotz.ui.components.ContactActionRow
+import com.example.sokotz.ui.components.SokoListingImage
 import com.example.ui.theme.SokoBlueBlack
 import com.example.ui.theme.SokoCardBorder
 import com.example.ui.theme.SokoCardSurface
@@ -160,15 +161,13 @@ fun ListingDetailScreen(
         ) {
             // Optional Product Image
             if (listing.imageUrl.isNotBlank()) {
-                AsyncImage(
-                    model = listing.imageUrl,
+                SokoListingImage(
+                    imageUrl = listing.imageUrl,
                     contentDescription = listing.localizedTitle(language),
-                    contentScale = ContentScale.Crop,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(240.dp)
-                        .clip(RoundedCornerShape(16.dp))
-                        .border(1.dp, SokoCardBorder, RoundedCornerShape(16.dp))
+                        .height(240.dp),
+                    shape = RoundedCornerShape(16.dp)
                 )
                 Spacer(modifier = Modifier.height(14.dp))
             }

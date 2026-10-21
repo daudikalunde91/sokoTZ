@@ -21,7 +21,8 @@ service cloud.firestore {
              (!('email' in data) || (data.email is string && data.email.size() <= 150)) &&
              (!('phoneNumber' in data) || (data.phoneNumber is string && data.phoneNumber.size() <= 50)) &&
              data.role is string && (data.role == 'CUSTOMER' || data.role == 'BUSINESS_OWNER' || data.role == 'ADMIN') &&
-             (!('photoUrl' in data) || data.photoUrl == null || (data.photoUrl is string && data.photoUrl.size() <= 500)) &&
+             (!('photoUrl' in data) || data.photoUrl == null || (data.photoUrl is string && data.photoUrl.size() <= 250000)) &&
+             (!('aiPreferredName' in data) || (data.aiPreferredName is string && data.aiPreferredName.size() <= 100)) &&
              (!('hasAcceptedTerms' in data) || data.hasAcceptedTerms is bool) &&
              (!('createdAt' in data) || data.createdAt is timestamp) &&
              (!('updatedAt' in data) || data.updatedAt is timestamp);
@@ -42,7 +43,7 @@ service cloud.firestore {
              (!('isVerified' in data) || data.isVerified is bool) &&
              (!('rating' in data) || data.rating is number) &&
              (!('reviewCount' in data) || data.reviewCount is int) &&
-             (!('openingHours' in data) || (data.openingHours is string && data.openingHours.size() <= 100)) &&
+             (!('openingHours' in data) || (data.openingHours is string && data.openingHours.size() <= 200)) &&
              (!('createdAt' in data) || data.createdAt is timestamp) &&
              (!('updatedAt' in data) || data.updatedAt is timestamp);
     }
@@ -82,23 +83,29 @@ service cloud.firestore {
       allow delete: if isSignedIn() && request.auth.uid == userId;
     }
 
-    // Businesses collection
+    // Businesses collection: public discovery, protected writes
     match /businesses/{businessId} {
-      allow get, list: if isSignedIn();
+      allow get, list: if true;
       allow create: if isSignedIn() && incoming().ownerId == request.auth.uid && isValidBusiness(incoming());
       allow update: if isSignedIn() && resource != null && 'ownerId' in resource.data && resource.data.ownerId == request.auth.uid && incoming().ownerId == resource.data.ownerId && isValidBusiness(incoming());
       allow delete: if isSignedIn() && resource != null && 'ownerId' in resource.data && resource.data.ownerId == request.auth.uid;
     }
 
-    // Listings collection
+    // Listings collection: public discovery, protected writes and atomic view counter
     match /listings/{listingId} {
-      allow get, list: if isSignedIn();
+      allow get, list: if true;
       allow create: if isSignedIn() && incoming().ownerId == request.auth.uid && isValidListing(incoming());
       allow update: if isSignedIn() && resource != null && (
         (resource.data.ownerId == request.auth.uid && incoming().ownerId == resource.data.ownerId && isValidListing(incoming())) ||
         (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['viewsCount', 'updatedAt']) && incoming().viewsCount == resource.data.viewsCount + 1)
       );
       allow delete: if isSignedIn() && resource != null && 'ownerId' in resource.data && resource.data.ownerId == request.auth.uid;
+
+      // Unique viewers subcollection
+      match /viewers/{viewerId} {
+        allow get, list: if isSignedIn();
+        allow create: if isSignedIn() && request.auth.uid == viewerId;
+      }
     }
   }
 }

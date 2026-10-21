@@ -38,11 +38,11 @@ beforeEach(async () => {
   }
 });
 
-test("Unauthenticated user: cannot read users, businesses, or listings", async () => {
+test("Unauthenticated user: cannot read users, but can read businesses and listings", async () => {
   const unauthDb = testEnv.unauthenticatedContext().firestore();
   await assertFails(unauthDb.collection("users").get());
-  await assertFails(unauthDb.collection("businesses").get());
-  await assertFails(unauthDb.collection("listings").get());
+  await assertSucceeds(unauthDb.collection("businesses").get());
+  await assertSucceeds(unauthDb.collection("listings").get());
 });
 
 test("Authenticated user: Alice can create and read her own user document", async () => {

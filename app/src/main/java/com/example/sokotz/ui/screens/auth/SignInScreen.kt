@@ -24,9 +24,11 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Business
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Email
+import androidx.compose.material.icons.filled.Explore
 import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Person
@@ -101,6 +103,7 @@ fun SignInScreen(
     authManager: AuthManager,
     language: AppLanguage,
     onToggleLanguage: () -> Unit,
+    onContinueAsGuest: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -114,6 +117,7 @@ fun SignInScreen(
 
     // Form States
     var registerName by remember { mutableStateOf("") }
+    var registerAiName by remember { mutableStateOf("") }
     var registerEmail by remember { mutableStateOf("") }
     var registerPhone by remember { mutableStateOf("") }
     var registerPassword by remember { mutableStateOf("") }
@@ -406,7 +410,17 @@ fun SignInScreen(
                             leadingIcon = { Icon(Icons.Default.Person, contentDescription = null, tint = SokoNeonBlue) },
                             singleLine = true,
                             colors = authTextFieldColors(),
-                            modifier = Modifier.fillMaxWidth()
+                            modifier = Modifier.fillMaxWidth().testTag("register_name_input")
+                        )
+
+                        OutlinedTextField(
+                            value = registerAiName,
+                            onValueChange = { registerAiName = it },
+                            label = { Text(if (isSw) "Jina la Kuitwa na sokoTZ AI (Hiari, mf. Daudi)" else "Preferred Name for sokoTZ AI (Optional)") },
+                            leadingIcon = { Icon(Icons.Default.AutoAwesome, contentDescription = null, tint = SokoNeonViolet) },
+                            singleLine = true,
+                            colors = authTextFieldColors(),
+                            modifier = Modifier.fillMaxWidth().testTag("register_ai_name_input")
                         )
 
                         OutlinedTextField(
@@ -582,7 +596,8 @@ fun SignInScreen(
                                         phone = registerPhone,
                                         role = registerRole,
                                         acceptedTerms = hasAcceptedTerms,
-                                        scope = scope
+                                        scope = scope,
+                                        aiPreferredName = registerAiName.ifBlank { registerName }
                                     )
                                 }
                             },
@@ -635,7 +650,8 @@ fun SignInScreen(
                                     name = registerName,
                                     phone = registerPhone,
                                     role = registerRole,
-                                    acceptedTerms = hasAcceptedTerms
+                                    acceptedTerms = hasAcceptedTerms,
+                                    aiPreferredName = registerAiName.ifBlank { registerName }
                                 )
                                 if (context is Activity) {
                                     authManager.signInWithGoogle(context, scope)
@@ -646,7 +662,31 @@ fun SignInScreen(
                 }
             }
 
-            Spacer(modifier = Modifier.height(20.dp))
+            // GUEST BROWSING BUTTON (Requirement 6)
+            if (onContinueAsGuest != null) {
+                Spacer(modifier = Modifier.height(14.dp))
+                OutlinedButton(
+                    onClick = onContinueAsGuest,
+                    shape = RoundedCornerShape(12.dp),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, SokoNeonBlue.copy(alpha = 0.5f)),
+                    colors = ButtonDefaults.outlinedButtonColors(containerColor = SokoMidnightBlue),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(48.dp)
+                        .testTag("continue_as_guest_button")
+                ) {
+                    Icon(Icons.Default.Explore, contentDescription = null, tint = SokoNeonBlue, modifier = Modifier.size(18.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = if (isSw) "Chunguza SokoTZ Kama Mgeni (Bila Kuingia)" else "Browse SokoTZ as Guest (Without Signing In)",
+                        color = SokoLightText,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(18.dp))
 
             // Trust Pillars Footnotes
             Row(

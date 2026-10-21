@@ -32,10 +32,13 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Business
 import androidx.compose.material.icons.filled.CameraAlt
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Inventory2
+import androidx.compose.material.icons.filled.Login
+import androidx.compose.material.icons.filled.Storefront
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -110,6 +113,7 @@ fun BusinessHubScreen(
     authManager: AuthManager,
     onNavigateToListing: (String) -> Unit,
     onNavigateToAssistant: () -> Unit,
+    onNavigateToSignIn: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -119,6 +123,114 @@ fun BusinessHubScreen(
     val businesses by repository.businesses.collectAsState()
     val listings by repository.listings.collectAsState()
     val isSw = language == AppLanguage.SW
+
+    if (currentUser == null) {
+        Column(
+            modifier = modifier
+                .fillMaxSize()
+                .background(SokoBlueBlack)
+                .padding(20.dp)
+                .verticalScroll(rememberScrollState()),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            Spacer(modifier = Modifier.height(24.dp))
+            Box(
+                modifier = Modifier
+                    .size(72.dp)
+                    .clip(CircleShape)
+                    .background(SokoGradients.AccentGradient),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(Icons.Default.Storefront, contentDescription = null, tint = SokoBlueBlack, modifier = Modifier.size(40.dp))
+            }
+            Text(
+                text = if (isSw) "Kituo cha Wafanyabiashara SokoTZ" else "SokoTZ Business Seller Hub",
+                style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
+                color = SokoLightText,
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center
+            )
+            Text(
+                text = if (isSw)
+                    "Kuuza kwenye SokoTZ kunahitaji akaunti ya mfanyabiashara ili uweze kusajili duka lako, kuweka muda wa kazi, kutuma matangazo, na kuwafikia wateja nchini Tanzania."
+                else
+                    "Selling on SokoTZ requires a seller account to register your store profile, specify working hours, publish listings, and connect with customers.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = SokoMutedText,
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center
+            )
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(12.dp))
+                    .border(1.dp, SokoCardBorder, RoundedCornerShape(12.dp)),
+                colors = CardDefaults.cardColors(containerColor = SokoMidnightBlue)
+            ) {
+                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text(
+                        text = if (isSw) "Faida za Kujiunga kama Muuzaji:" else "Seller Benefits:",
+                        style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                        color = SokoNeonBlue
+                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.Check, contentDescription = null, tint = SokoNeonBlue, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = if (isSw) "Sajili wasifu wa duka lako na muda maalum wa kazi" else "Register store profile with working hours",
+                            color = SokoLightText,
+                            fontSize = 12.sp
+                        )
+                    }
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.Check, contentDescription = null, tint = SokoNeonBlue, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = if (isSw) "Weka picha kutoka kwenye kamera au galari ya simu" else "Upload photos using camera or gallery",
+                            color = SokoLightText,
+                            fontSize = 12.sp
+                        )
+                    }
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.Check, contentDescription = null, tint = SokoNeonBlue, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = if (isSw) "Tazama idadi halisi ya watazamaji (Unique Viewers)" else "Track unique viewers per user account",
+                            color = SokoLightText,
+                            fontSize = 12.sp
+                        )
+                    }
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.Check, contentDescription = null, tint = SokoNeonBlue, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = if (isSw) "Usaidizi wa sokoTZ AI kutunga maelezo ya kuvutia" else "Draft ad copy with sokoTZ AI assistance",
+                            color = SokoLightText,
+                            fontSize = 12.sp
+                        )
+                    }
+                }
+            }
+            Button(
+                onClick = onNavigateToSignIn,
+                colors = ButtonDefaults.buttonColors(containerColor = SokoNeonBlue),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(48.dp)
+                    .testTag("seller_gate_signin_button"),
+                shape = RoundedCornerShape(10.dp)
+            ) {
+                Icon(Icons.Default.Login, contentDescription = null, tint = SokoBlueBlack, modifier = Modifier.size(18.dp))
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = if (isSw) "Ingia au Fungua Akaunti ya Muuzaji" else "Sign In or Register as Seller",
+                    color = SokoBlueBlack,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 13.sp
+                )
+            }
+        }
+        return
+    }
 
     var currentTab by remember { mutableIntStateOf(0) } // 0: Dashboard, 1: Add Listing, 2: Onboard/Edit Business
     var editingListing by remember { mutableStateOf<Listing?>(null) }
@@ -814,6 +926,7 @@ fun BusinessHubScreen(
                 var bizDistrict by remember { mutableStateOf(userBusiness?.district ?: "Ilala") }
                 var bizPhone by remember { mutableStateOf(userBusiness?.phoneNumber ?: "+255") }
                 var bizWhatsapp by remember { mutableStateOf(userBusiness?.whatsappNumber ?: "+255") }
+                var bizOpeningHours by remember { mutableStateOf(userBusiness?.openingHours ?: "Jumatatu - Jumamosi: 08:00 - 18:00") }
                 var bizDescription by remember { mutableStateOf(userBusiness?.descriptionSw ?: "") }
                 var isSubmittingBiz by remember { mutableStateOf(false) }
 
@@ -825,6 +938,7 @@ fun BusinessHubScreen(
                         bizDistrict = it.district
                         bizPhone = it.phoneNumber
                         bizWhatsapp = it.whatsappNumber
+                        bizOpeningHours = it.openingHours
                         bizDescription = it.descriptionSw
                     }
                 }
@@ -918,6 +1032,21 @@ fun BusinessHubScreen(
                     )
 
                     OutlinedTextField(
+                        value = bizOpeningHours,
+                        onValueChange = { bizOpeningHours = it },
+                        label = { Text(if (isSw) "Muda wa Kazi (mf. Jumatatu - Jumamosi: 8:00 Asubuhi - 2:00 Usiku)" else "Working Hours (e.g. Mon - Sat: 8:00 AM - 6:00 PM)", color = SokoMutedText) },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("onboard_biz_hours_input"),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = SokoNeonBlue,
+                            unfocusedBorderColor = SokoCardBorder,
+                            focusedTextColor = SokoLightText,
+                            unfocusedTextColor = SokoLightText
+                        )
+                    )
+
+                    OutlinedTextField(
                         value = bizDescription,
                         onValueChange = { bizDescription = it },
                         label = { Text(if (isSw) "Maelezo ya Biashara & Huduma Unazotoa" else "Description & Services Offered", color = SokoMutedText) },
@@ -950,7 +1079,8 @@ fun BusinessHubScreen(
                                         district = bizDistrict,
                                         phoneNumber = bizPhone,
                                         whatsappNumber = bizWhatsapp,
-                                        description = bizDescription
+                                        description = bizDescription,
+                                        openingHours = bizOpeningHours
                                     )
                                 } else {
                                     repository.registerBusinessProfile(
@@ -960,7 +1090,8 @@ fun BusinessHubScreen(
                                         district = bizDistrict,
                                         phoneNumber = bizPhone,
                                         whatsappNumber = bizWhatsapp,
-                                        description = bizDescription
+                                        description = bizDescription,
+                                        openingHours = bizOpeningHours
                                     )
                                 }
                                 isSubmittingBiz = false

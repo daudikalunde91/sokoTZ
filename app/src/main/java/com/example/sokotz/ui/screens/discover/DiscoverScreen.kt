@@ -27,13 +27,16 @@ import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Category
 import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material.icons.filled.Login
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Storefront
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
@@ -50,6 +53,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.google.firebase.auth.FirebaseUser
 import com.example.sokotz.data.model.AppLanguage
 import com.example.sokotz.data.model.Category
 import com.example.sokotz.data.repository.FirestoreMarketplaceRepository
@@ -75,6 +79,8 @@ fun DiscoverScreen(
     onNavigateToListing: (String) -> Unit,
     onNavigateToAssistant: () -> Unit,
     onNavigateToBusinessHub: () -> Unit,
+    currentUser: FirebaseUser? = null,
+    onNavigateToSignIn: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val language by repository.language.collectAsState()
@@ -120,6 +126,25 @@ fun DiscoverScreen(
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = SokoNeonBlue
                             )
+                        }
+
+                        if (currentUser == null) {
+                            Button(
+                                onClick = onNavigateToSignIn,
+                                colors = ButtonDefaults.buttonColors(containerColor = SokoNeonBlue),
+                                shape = RoundedCornerShape(8.dp),
+                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
+                                modifier = Modifier.testTag("home_guest_signin_button")
+                            ) {
+                                Icon(Icons.Default.Login, contentDescription = null, tint = SokoBlueBlack, modifier = Modifier.size(14.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                    text = if (isSw) "Ingia" else "Sign In",
+                                    color = SokoBlueBlack,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 11.sp
+                                )
+                            }
                         }
                     }
 
@@ -167,6 +192,69 @@ fun DiscoverScreen(
                     )
 
                     Spacer(modifier = Modifier.height(14.dp))
+
+                    if (currentUser == null) {
+                        // Customer / Guest Landing Card (Requirement 6)
+                        Card(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(12.dp))
+                                .border(1.dp, SokoNeonBlue.copy(alpha = 0.5f), RoundedCornerShape(12.dp))
+                                .testTag("guest_landing_banner"),
+                            colors = CardDefaults.cardColors(containerColor = SokoMidnightBlue)
+                        ) {
+                            Column(modifier = Modifier.padding(14.dp)) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(Icons.Default.Storefront, contentDescription = null, tint = SokoNeonBlue, modifier = Modifier.size(20.dp))
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(
+                                        text = if (isSw) "Karibu Mteja! Gundua & Nunua Bila Akaunti" else "Welcome Shopper! Browse Free Without Sign-In",
+                                        style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                                        color = SokoLightText
+                                    )
+                                }
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    text = if (isSw)
+                                        "Unaweza kuangalia bidhaa zote na kupiga simu kwa wauzaji moja kwa moja bila kikwazo. Ili kuweka tangazo lako au kutumia sokoTZ AI, ingia hapa:"
+                                    else
+                                        "Explore all listings and contact sellers directly without restriction. To post listings or use sokoTZ AI, sign in here:",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = SokoMutedText
+                                )
+                                Spacer(modifier = Modifier.height(10.dp))
+                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    Button(
+                                        onClick = onNavigateToSignIn,
+                                        colors = ButtonDefaults.buttonColors(containerColor = SokoNeonBlue),
+                                        shape = RoundedCornerShape(8.dp),
+                                        modifier = Modifier.weight(1f).height(36.dp)
+                                    ) {
+                                        Text(
+                                            text = if (isSw) "Ingia / Jisajili" else "Sign In / Register",
+                                            color = SokoBlueBlack,
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 11.sp
+                                        )
+                                    }
+                                    OutlinedButton(
+                                        onClick = { onNavigateToBusinessHub() },
+                                        border = androidx.compose.foundation.BorderStroke(1.dp, SokoNeonViolet),
+                                        shape = RoundedCornerShape(8.dp),
+                                        modifier = Modifier.weight(1f).height(36.dp)
+                                    ) {
+                                        Text(
+                                            text = if (isSw) "Uza SokoTZ" else "Sell on SokoTZ",
+                                            color = SokoNeonViolet,
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 11.sp
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(14.dp))
+                    }
 
                     // SokoTZ Assistant Prompt Card
                     Card(

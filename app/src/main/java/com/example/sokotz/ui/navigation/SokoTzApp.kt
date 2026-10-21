@@ -57,6 +57,7 @@ import com.example.sokotz.ui.screens.discover.DiscoverScreen
 import com.example.sokotz.ui.screens.listing.ListingDetailScreen
 import com.example.sokotz.ui.screens.search.SearchScreen
 import com.example.ui.theme.SokoBlueBlack
+import androidx.activity.compose.BackHandler
 import com.example.ui.theme.SokoCardBorder
 import com.example.ui.theme.SokoDeepNavy
 import com.example.ui.theme.SokoLightText
@@ -70,6 +71,7 @@ sealed class Screen {
     object Assistant : Screen()
     object BusinessHub : Screen()
     object Account : Screen()
+    object SignIn : Screen()
     data class BusinessDetail(val businessId: String) : Screen()
     data class ListingDetail(val listingId: String) : Screen()
 }
@@ -97,6 +99,7 @@ fun SokoTzApp() {
 
     val language by repository.language.collectAsState()
     val currentUser by authManager.currentUser.collectAsState()
+    val userProfile by authManager.userProfile.collectAsState()
     val isSw = language == AppLanguage.SW
 
     var currentScreen by remember { mutableStateOf<Screen>(Screen.Discover) }
@@ -106,11 +109,38 @@ fun SokoTzApp() {
         authManager.attemptAutoSignIn(scope)
     }
 
-    if (currentUser == null) {
+    // Sync personalized name with sokoTZ AI (Requirement 5)
+    LaunchedEffect(userProfile, currentUser) {
+        val preferred = userProfile?.aiPreferredName?.ifBlank { userProfile?.displayName }
+            ?: currentUser?.displayName ?: ""
+        if (preferred.isNotBlank()) {
+            repository.setAssistantUserName(preferred)
+        }
+    }
+
+    // When user logs in from SignIn screen, return to Discover
+    LaunchedEffect(currentUser) {
+        if (currentUser != null && currentScreen is Screen.SignIn) {
+            currentScreen = Screen.Discover
+            selectedTab = BottomNavTab.DISCOVER
+        }
+    }
+
+    // Back button handling
+    BackHandler(enabled = currentScreen !is Screen.Discover) {
+        currentScreen = Screen.Discover
+        selectedTab = BottomNavTab.DISCOVER
+    }
+
+    if (currentScreen is Screen.SignIn) {
         SignInScreen(
             authManager = authManager,
             language = language,
-            onToggleLanguage = { repository.toggleLanguage() }
+            onToggleLanguage = { repository.toggleLanguage() },
+            onContinueAsGuest = {
+                currentScreen = Screen.Discover
+                selectedTab = BottomNavTab.DISCOVER
+            }
         )
     } else {
         Scaffold(
@@ -213,6 +243,10 @@ fun SokoTzApp() {
                         onNavigateToBusinessHub = {
                             selectedTab = BottomNavTab.BUSINESS
                             currentScreen = Screen.BusinessHub
+                        },
+                        currentUser = currentUser,
+                        onNavigateToSignIn = {
+                            currentScreen = Screen.SignIn
                         }
                     )
                 }
@@ -231,30 +265,28 @@ fun SokoTzApp() {
                         repository = repository,
                         onNavigateToListing = { listingId ->
                             currentScreen = Screen.ListingDetail(listingId)
+                        },
+                        currentUser = currentUser,
+                        onNavigateToSignIn = {
+                            currentScreen = Screen.SignIn
                         }
                     )
                 }
                 is Screen.BusinessHub -> {
-                    if (currentUser == null) {
-                        // Prompt authentication to manage a business
-                        AccountScreen(
-                            authManager = authManager,
-                            repository = repository,
-                            onNavigateToBusinessHub = { currentScreen = Screen.BusinessHub }
-                        )
-                    } else {
-                        BusinessHubScreen(
-                            repository = repository,
-                            authManager = authManager,
-                            onNavigateToListing = { listingId ->
-                                currentScreen = Screen.ListingDetail(listingId)
-                            },
-                            onNavigateToAssistant = {
-                                selectedTab = BottomNavTab.ASSISTANT
-                                currentScreen = Screen.Assistant
-                            }
-                        )
-                    }
+                    BusinessHubScreen(
+                        repository = repository,
+                        authManager = authManager,
+                        onNavigateToListing = { listingId ->
+                            currentScreen = Screen.ListingDetail(listingId)
+                        },
+                        onNavigateToAssistant = {
+                            selectedTab = BottomNavTab.ASSISTANT
+                            currentScreen = Screen.Assistant
+                        },
+                        onNavigateToSignIn = {
+                            currentScreen = Screen.SignIn
+                        }
+                    )
                 }
                 is Screen.Account -> {
                     AccountScreen(
@@ -263,6 +295,9 @@ fun SokoTzApp() {
                         onNavigateToBusinessHub = {
                             selectedTab = BottomNavTab.BUSINESS
                             currentScreen = Screen.BusinessHub
+                        },
+                        onNavigateToSignIn = {
+                            currentScreen = Screen.SignIn
                         }
                     )
                 }
@@ -285,6 +320,10 @@ fun SokoTzApp() {
                             currentScreen = Screen.BusinessDetail(businessId)
                         }
                     )
+                }
+                is Screen.SignIn -> {
+                    // Handled at top-level; fallback to Discover if reached here
+                    currentScreen = Screen.Discover
                 }
             }
         }

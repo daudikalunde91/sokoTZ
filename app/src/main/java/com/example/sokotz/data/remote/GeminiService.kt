@@ -77,14 +77,22 @@ object GeminiClient {
     suspend fun chat(
         conversationHistory: List<Pair<String, String>>, // role ("user"/"model") to text
         userMessage: String,
-        marketplaceContext: String = ""
+        marketplaceContext: String = "",
+        userName: String = ""
     ): String = withContext(Dispatchers.IO) {
         val apiKey = BuildConfig.GEMINI_API_KEY
         val trimmed = userMessage.trim()
 
+        val userGreetingInstruction = if (userName.isNotBlank()) {
+            "\nMtumiaji huyu anaitwa '$userName'. Anza kumsalimia kwa jina lake au msalimie kwa jina hili anapoongea nawe."
+        } else {
+            ""
+        }
+
         val systemPrompt = """
             Wewe ni sokoTZ Msaidizi (sokoTZ AI) — msaidizi rasmi wa kidijitali wa jukwaa kuu la SokoTZ nchini Tanzania.
             Lugha zako kuu ni Kiswahili na Kiingereza. Jibu kwa ufasaha kulingana na lugha anayotumia mteja.
+            $userGreetingInstruction
             Majukumu yako:
             1. Kusaidia wanunuzi na wateja kupata biashara zilizothibitishwa, bidhaa za maduka ya Kariakoo, Arusha, Mwanza na nchi nzima.
             2. Kusaidia wafanyabiashara kutunga maelezo ya kuvutia ya matangazo (product sales copy).

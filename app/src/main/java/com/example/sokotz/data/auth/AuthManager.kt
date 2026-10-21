@@ -19,6 +19,7 @@ import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseUser
 import com.google.firebase.auth.GoogleAuthProvider
 import com.google.firebase.auth.auth
+import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -157,13 +158,15 @@ class AuthManager(private val context: Context) {
         phone: String,
         role: String,
         acceptedTerms: Boolean,
-        scope: CoroutineScope
+        scope: CoroutineScope,
+        aiPreferredName: String = ""
     ) {
         setPendingRegistration(
             name = displayName,
             phone = phone,
             role = role,
-            acceptedTerms = acceptedTerms
+            acceptedTerms = acceptedTerms,
+            aiPreferredName = aiPreferredName
         )
         signInWithGoogle(activity, scope)
     }
@@ -172,12 +175,14 @@ class AuthManager(private val context: Context) {
     private var pendingPhoneNumber: String? = null
     private var pendingRole: String = "CUSTOMER"
     private var pendingAcceptedTerms: Boolean = true
+    private var pendingAiPreferredName: String? = null
 
-    fun setPendingRegistration(name: String, phone: String, role: String, acceptedTerms: Boolean) {
+    fun setPendingRegistration(name: String, phone: String, role: String, acceptedTerms: Boolean, aiPreferredName: String = "") {
         pendingDisplayName = name.trim().ifBlank { null }
         pendingPhoneNumber = phone.trim().ifBlank { null }
         pendingRole = if (role == "BUSINESS_OWNER") "BUSINESS_OWNER" else "CUSTOMER"
         pendingAcceptedTerms = acceptedTerms
+        pendingAiPreferredName = aiPreferredName.trim().ifBlank { null }
     }
 
     private fun loadOrCreateUserProfile(user: FirebaseUser) {
@@ -187,31 +192,37 @@ class AuthManager(private val context: Context) {
             if (snapshot.exists()) {
                 val existing = snapshot.toObject(UserProfile::class.java)
                 // If user registered with updated details, merge them
-                if (pendingDisplayName != null || pendingPhoneNumber != null) {
+                if (pendingDisplayName != null || pendingPhoneNumber != null || pendingAiPreferredName != null) {
                     val updatedName = pendingDisplayName ?: existing?.displayName ?: user.displayName ?: "Mwanachama SokoTZ"
                     val updatedPhone = pendingPhoneNumber ?: existing?.phoneNumber ?: user.phoneNumber ?: ""
+                    val updatedAiName = pendingAiPreferredName ?: existing?.aiPreferredName ?: ""
                     val updatedRole = pendingRole
                     val updates = hashMapOf<String, Any>(
                         "displayName" to updatedName,
                         "phoneNumber" to updatedPhone,
                         "role" to updatedRole,
-                        "hasAcceptedTerms" to true
+                        "aiPreferredName" to updatedAiName,
+                        "hasAcceptedTerms" to true,
+                        "updatedAt" to FieldValue.serverTimestamp()
                     )
                     docRef.update(updates)
                     _userProfile.value = existing?.copy(
                         displayName = updatedName,
                         phoneNumber = updatedPhone,
                         role = updatedRole,
+                        aiPreferredName = updatedAiName,
                         hasAcceptedTerms = true
                     )
                     pendingDisplayName = null
                     pendingPhoneNumber = null
+                    pendingAiPreferredName = null
                 } else {
                     _userProfile.value = existing
                 }
             } else {
                 val displayName = pendingDisplayName ?: user.displayName ?: "Mwanachama SokoTZ"
                 val phoneNumber = pendingPhoneNumber ?: user.phoneNumber ?: ""
+                val aiPreferred = pendingAiPreferredName ?: ""
                 val role = pendingRole
                 val newProfile = UserProfile(
                     id = user.uid,
@@ -221,12 +232,14 @@ class AuthManager(private val context: Context) {
                     phoneNumber = phoneNumber,
                     role = role,
                     photoUrl = user.photoUrl?.toString() ?: "",
+                    aiPreferredName = aiPreferred,
                     hasAcceptedTerms = pendingAcceptedTerms
                 )
                 docRef.set(newProfile)
                 _userProfile.value = newProfile
                 pendingDisplayName = null
                 pendingPhoneNumber = null
+                pendingAiPreferredName = null
             }
         }.addOnFailureListener { e ->
             Log.e("AuthManager", "Failed to fetch user profile", e)
@@ -237,8 +250,38 @@ class AuthManager(private val context: Context) {
                 email = user.email ?: "",
                 phoneNumber = pendingPhoneNumber ?: user.phoneNumber ?: "",
                 role = pendingRole,
+                aiPreferredName = pendingAiPreferredName ?: "",
                 hasAcceptedTerms = pendingAcceptedTerms
             )
+        }
+    }
+
+    suspend fun updateUserProfile(
+        displayName: String,
+        phoneNumber: String,
+        photoUrl: String,
+        aiPreferredName: String
+    ): Result<Unit> {
+        val user = auth.currentUser ?: return Result.failure(Exception("Not signed in"))
+        val db = getDb()
+        val updates = hashMapOf<String, Any>(
+            "displayName" to displayName.trim(),
+            "phoneNumber" to phoneNumber.trim(),
+            "photoUrl" to photoUrl.trim(),
+            "aiPreferredName" to aiPreferredName.trim(),
+            "updatedAt" to FieldValue.serverTimestamp()
+        )
+        return try {
+            db.collection("users").document(user.uid).update(updates).await()
+            _userProfile.value = _userProfile.value?.copy(
+                displayName = displayName.trim(),
+                phoneNumber = phoneNumber.trim(),
+                photoUrl = photoUrl.trim(),
+                aiPreferredName = aiPreferredName.trim()
+            )
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
         }
     }
 

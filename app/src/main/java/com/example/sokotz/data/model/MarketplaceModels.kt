@@ -27,6 +27,12 @@ enum class AppLanguage(val code: String, val displayName: String) {
     EN("en", "English")
 }
 
+enum class AppThemeMode(val titleSw: String, val titleEn: String) {
+    SYSTEM("Mfumo", "System"),
+    DARK("Giza", "Dark"),
+    LIGHT("Mwangaza", "Light")
+}
+
 @IgnoreExtraProperties
 data class UserProfile(
     @DocumentId val id: String = "",
@@ -36,6 +42,7 @@ data class UserProfile(
     val phoneNumber: String = "",
     val role: String = "CUSTOMER",
     val photoUrl: String = "",
+    val aiPreferredName: String = "",
     val hasAcceptedTerms: Boolean = true,
     @ServerTimestamp val createdAt: Timestamp? = null,
     @ServerTimestamp val updatedAt: Timestamp? = null

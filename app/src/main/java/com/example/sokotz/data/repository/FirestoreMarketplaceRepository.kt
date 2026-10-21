@@ -94,22 +94,28 @@ class FirestoreMarketplaceRepository(
             activeUserId = newUid
             // Load new user's conversation or fresh welcome message
             if (newUid != null) {
-                _assistantMessages.value = userConversations[newUid] ?: listOf(getWelcomeMessage(user.displayName ?: ""))
+                val greetingName = currentAiUserName.ifBlank { user.displayName ?: "" }
+                _assistantMessages.value = userConversations[newUid] ?: listOf(getWelcomeMessage(greetingName))
             } else {
-                _assistantMessages.value = listOf(getWelcomeMessage())
+                _assistantMessages.value = listOf(getWelcomeMessage(currentAiUserName))
             }
         }
-        if (user != null) {
-            startRealtimeListeners()
-        } else {
-            stopRealtimeListeners()
-        }
+        startRealtimeListeners()
     }
 
     init {
         auth.addAuthStateListener(authStateListener)
-        if (auth.currentUser != null) {
-            startRealtimeListeners()
+        startRealtimeListeners()
+    }
+
+    private var currentAiUserName: String = ""
+
+    fun setAssistantUserName(name: String) {
+        val trimmed = name.trim()
+        if (trimmed == currentAiUserName) return
+        currentAiUserName = trimmed
+        if (_assistantMessages.value.size <= 1) {
+            _assistantMessages.value = listOf(getWelcomeMessage(trimmed))
         }
     }
 
@@ -122,7 +128,6 @@ class FirestoreMarketplaceRepository(
     }
 
     private fun startRealtimeListeners() {
-        if (auth.currentUser == null) return
         if (businessesListener != null && listingsListener != null) return
 
         businessesListener?.remove()
@@ -235,7 +240,8 @@ class FirestoreMarketplaceRepository(
         district: String,
         phoneNumber: String,
         whatsappNumber: String,
-        description: String
+        description: String,
+        openingHours: String = "Jumatatu - Jumamosi: 08:00 - 18:00"
     ): Result<String> {
         val currentUserId = try {
             requireUserId()
@@ -260,7 +266,7 @@ class FirestoreMarketplaceRepository(
             "isVerified" to false,
             "rating" to 5.0,
             "reviewCount" to 0,
-            "openingHours" to "Jumatatu - Jumamosi: 08:00 - 18:00",
+            "openingHours" to openingHours.trim().ifBlank { "Jumatatu - Jumamosi: 08:00 - 18:00" },
             "address" to "$district, $city",
             "createdAt" to FieldValue.serverTimestamp(),
             "updatedAt" to FieldValue.serverTimestamp()
@@ -394,7 +400,8 @@ class FirestoreMarketplaceRepository(
         district: String,
         phoneNumber: String,
         whatsappNumber: String,
-        description: String
+        description: String,
+        openingHours: String = "Jumatatu - Jumamosi: 08:00 - 18:00"
     ): Result<Unit> {
         try {
             requireUserId()
@@ -414,6 +421,7 @@ class FirestoreMarketplaceRepository(
             "whatsappNumber" to whatsappNumber.trim(),
             "descriptionSw" to description.trim(),
             "descriptionEn" to description.trim(),
+            "openingHours" to openingHours.trim().ifBlank { "Jumatatu - Jumamosi: 08:00 - 18:00" },
             "address" to "$district, $city",
             "updatedAt" to FieldValue.serverTimestamp()
         )
@@ -427,8 +435,34 @@ class FirestoreMarketplaceRepository(
         }
     }
 
+    private val viewedListingsPerUser = mutableMapOf<String, MutableSet<String>>()
+
     suspend fun incrementListingView(listingId: String) {
-        if (auth.currentUser == null) return
+        val currentUser = auth.currentUser
+        val uid = currentUser?.uid ?: "guest"
+        val userViewed = viewedListingsPerUser.getOrPut(uid) { mutableSetOf() }
+        if (userViewed.contains(listingId)) {
+            return
+        }
+
+        // For signed-in users, record in Firestore subcollection to prevent repeat counts across app restarts
+        if (currentUser != null) {
+            val viewerDoc = db.collection("listings").document(listingId)
+                .collection("viewers").document(currentUser.uid)
+            try {
+                val snapshot = viewerDoc.get().await()
+                if (snapshot.exists()) {
+                    userViewed.add(listingId)
+                    return
+                }
+                viewerDoc.set(mapOf("viewedAt" to FieldValue.serverTimestamp())).await()
+            } catch (e: Exception) {
+                Log.w("FirestoreRepo", "Could not check viewer record", e)
+            }
+        }
+
+        userViewed.add(listingId)
+
         try {
             db.collection("listings").document(listingId).update(
                 mapOf(
@@ -472,10 +506,12 @@ class FirestoreMarketplaceRepository(
                     }
                 }
 
+                val currentUserName = if (currentAiUserName.isNotBlank()) currentAiUserName else (auth.currentUser?.displayName ?: "")
                 val aiResponse = GeminiClient.chat(
                     conversationHistory = history,
                     userMessage = trimmed,
-                    marketplaceContext = marketplaceContext
+                    marketplaceContext = marketplaceContext,
+                    userName = currentUserName
                 )
 
                 val matchedListings = _listings.value.filter { listing ->

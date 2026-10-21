@@ -30,8 +30,11 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Login
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -58,6 +61,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.google.firebase.auth.FirebaseUser
 import com.example.sokotz.data.model.AppLanguage
 import com.example.sokotz.data.model.AssistantMessage
 import com.example.sokotz.data.repository.FirestoreMarketplaceRepository
@@ -78,6 +82,8 @@ import com.example.ui.theme.SokoNeonViolet
 fun AssistantScreen(
     repository: FirestoreMarketplaceRepository,
     onNavigateToListing: (String) -> Unit,
+    currentUser: FirebaseUser? = null,
+    onNavigateToSignIn: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -263,7 +269,13 @@ fun AssistantScreen(
                                     .clip(RoundedCornerShape(10.dp))
                                     .background(SokoCardSurface)
                                     .border(1.dp, SokoCardBorder, RoundedCornerShape(10.dp))
-                                    .clickable { repository.sendAssistantMessage(question, scope) }
+                                    .clickable {
+                                        if (currentUser == null) {
+                                            onNavigateToSignIn()
+                                        } else {
+                                            repository.sendAssistantMessage(question, scope)
+                                        }
+                                    }
                                     .padding(horizontal = 12.dp, vertical = 10.dp)
                                     .testTag("suggested_prompt_chip")
                             ) {
@@ -291,64 +303,114 @@ fun AssistantScreen(
             }
         }
 
-        // Input bar
-        Surface(
-            color = SokoMidnightBlue,
-            modifier = Modifier
-                .fillMaxWidth()
-                .border(1.dp, SokoCardBorder, RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp))
-        ) {
-            Row(
+        if (currentUser == null) {
+            Surface(
+                color = SokoMidnightBlue,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(12.dp),
-                verticalAlignment = Alignment.CenterVertically
+                    .clip(RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp))
+                    .border(1.dp, SokoNeonViolet.copy(alpha = 0.5f), RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp))
             ) {
-                OutlinedTextField(
-                    value = inputText,
-                    onValueChange = { inputText = it },
-                    placeholder = {
-                        Text(
-                            text = if (isSw) "Uliza kwa Kiswahili au Kiingereza..." else "Ask in Kiswahili or English...",
-                            color = SokoMutedText,
-                            style = MaterialTheme.typography.bodyMedium
-                        )
-                    },
-                    modifier = Modifier
-                        .weight(1f)
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(SokoDeepNavy)
-                        .testTag("assistant_text_input"),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = SokoNeonBlue,
-                        unfocusedBorderColor = SokoCardBorder,
-                        focusedTextColor = SokoLightText,
-                        unfocusedTextColor = SokoLightText
-                    ),
-                    maxLines = 3,
-                    enabled = !isThinking
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                IconButton(
-                    onClick = {
-                        if (inputText.isNotBlank() && !isThinking) {
-                            val textToSend = inputText
-                            inputText = ""
-                            repository.sendAssistantMessage(textToSend, scope)
-                        }
-                    },
-                    enabled = inputText.isNotBlank() && !isThinking,
-                    modifier = Modifier
-                        .size(48.dp)
-                        .clip(CircleShape)
-                        .background(if (inputText.isNotBlank() && !isThinking) SokoNeonBlue else SokoCardBorder)
-                        .testTag("assistant_send_button")
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Filled.Send,
-                        contentDescription = "Send",
-                        tint = if (inputText.isNotBlank() && !isThinking) SokoBlueBlack else SokoMutedText
+                    Text(
+                        text = if (isSw) "Ingia Kuanza Kuongea na sokoTZ AI" else "Sign In to Chat with sokoTZ AI",
+                        fontWeight = FontWeight.Bold,
+                        color = SokoLightText,
+                        fontSize = 14.sp
                     )
+                    Text(
+                        text = if (isSw)
+                            "sokoTZ AI inahitaji akaunti ili iweze kukukaribisha kwa jina lako na kukupa ushauri wa bidhaa na biashara uliolengwa kwako."
+                        else
+                            "Sign in to personalize your conversation with sokoTZ AI and receive tailored marketplace recommendations.",
+                        color = SokoMutedText,
+                        fontSize = 12.sp,
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                    )
+                    Button(
+                        onClick = onNavigateToSignIn,
+                        colors = ButtonDefaults.buttonColors(containerColor = SokoNeonBlue),
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(42.dp)
+                            .testTag("assistant_guest_signin_button")
+                    ) {
+                        Icon(Icons.Default.Login, contentDescription = null, tint = SokoBlueBlack, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = if (isSw) "Ingia / Fungua Akaunti Bure" else "Sign In / Register Free",
+                            color = SokoBlueBlack,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 13.sp
+                        )
+                    }
+                }
+            }
+        } else {
+            // Input bar
+            Surface(
+                color = SokoMidnightBlue,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .border(1.dp, SokoCardBorder, RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp))
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    OutlinedTextField(
+                        value = inputText,
+                        onValueChange = { inputText = it },
+                        placeholder = {
+                            Text(
+                                text = if (isSw) "Uliza kwa Kiswahili au Kiingereza..." else "Ask in Kiswahili or English...",
+                                color = SokoMutedText,
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                        },
+                        modifier = Modifier
+                            .weight(1f)
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(SokoDeepNavy)
+                            .testTag("assistant_text_input"),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = SokoNeonBlue,
+                            unfocusedBorderColor = SokoCardBorder,
+                            focusedTextColor = SokoLightText,
+                            unfocusedTextColor = SokoLightText
+                        ),
+                        maxLines = 3,
+                        enabled = !isThinking
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    IconButton(
+                        onClick = {
+                            if (inputText.isNotBlank() && !isThinking) {
+                                val textToSend = inputText
+                                inputText = ""
+                                repository.sendAssistantMessage(textToSend, scope)
+                            }
+                        },
+                        enabled = inputText.isNotBlank() && !isThinking,
+                        modifier = Modifier
+                            .size(48.dp)
+                            .clip(CircleShape)
+                            .background(if (inputText.isNotBlank() && !isThinking) SokoNeonBlue else SokoCardBorder)
+                            .testTag("assistant_send_button")
+                    ) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.Send,
+                            contentDescription = "Send",
+                            tint = if (inputText.isNotBlank() && !isThinking) SokoBlueBlack else SokoMutedText
+                        )
+                    }
                 }
             }
         }

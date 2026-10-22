@@ -144,6 +144,62 @@ class AuthManager(private val context: Context) {
         }
     }
 
+    /**
+     * Genuine email/password sign-in using FirebaseAuth.signInWithEmailAndPassword
+     */
+    fun signInStandard(
+        email: String,
+        password: String,
+        scope: CoroutineScope,
+        onSuccess: () -> Unit = {},
+        onError: (String) -> Unit = {}
+    ) {
+        val trimmedEmail = email.trim()
+        val trimmedPassword = password.trim()
+        if (trimmedEmail.isBlank() || trimmedPassword.isBlank()) {
+            val err = "Tafadhali weka barua pepe na nenosiri (Please enter email and password)"
+            _authError.value = err
+            onError(err)
+            return
+        }
+
+        _isLoading.value = true
+        _authError.value = null
+        scope.launch {
+            try {
+                val result = auth.signInWithEmailAndPassword(trimmedEmail, trimmedPassword).await()
+                val user = result.user
+                if (user != null) {
+                    _currentUser.value = user
+                    loadOrCreateUserProfile(user)
+                    onSuccess()
+                } else {
+                    val err = "Imeshindikana kuingia (Authentication failed)"
+                    _authError.value = err
+                    onError(err)
+                }
+            } catch (e: Exception) {
+                Log.e("AuthManager", "Email/Password sign-in failed", e)
+                val message = when {
+                    e.message?.contains("user-not-found", ignoreCase = true) == true ||
+                    e.message?.contains("no user record", ignoreCase = true) == true ->
+                        "Akaunti hii haipo. Tafadhali jisajili kwanza (Account not found. Please register)"
+                    e.message?.contains("wrong-password", ignoreCase = true) == true ||
+                    e.message?.contains("invalid-credential", ignoreCase = true) == true ->
+                        "Nenosiri sio sahihi au akaunti haikupatikana (Invalid credentials)"
+                    e.message?.contains("network", ignoreCase = true) == true ->
+                        "Hitilafu ya mtandao. Tafadhali angalia intaneti yako (Network failure)"
+                    else -> e.localizedMessage ?: "Imeshindikana kuingia (Sign in failed)"
+                }
+                _authError.value = message
+                onError(message)
+            } finally {
+                _isLoading.value = false
+            }
+        }
+    }
+
+    // Overload for backward compatibility
     fun signInStandard(activity: Activity, email: String, scope: CoroutineScope) {
         val trimmedEmail = email.trim()
         if (trimmedEmail.isNotBlank()) {
@@ -152,6 +208,99 @@ class AuthManager(private val context: Context) {
         signInWithGoogle(activity, scope)
     }
 
+    /**
+     * Genuine email/password registration using FirebaseAuth.createUserWithEmailAndPassword
+     */
+    fun registerStandard(
+        email: String,
+        password: String,
+        displayName: String,
+        phone: String,
+        role: String,
+        acceptedTerms: Boolean,
+        scope: CoroutineScope,
+        aiPreferredName: String = "",
+        onSuccess: () -> Unit = {},
+        onError: (String) -> Unit = {}
+    ) {
+        val trimmedEmail = email.trim()
+        val trimmedPassword = password.trim()
+        val trimmedName = displayName.trim()
+
+        if (trimmedEmail.isBlank() || trimmedPassword.isBlank()) {
+            val err = "Tafadhali weka barua pepe na nenosiri (Email and password required)"
+            _authError.value = err
+            onError(err)
+            return
+        }
+        if (trimmedPassword.length < 6) {
+            val err = "Nenosiri lazima liwe na angalau herufi 6 (Password must be at least 6 characters)"
+            _authError.value = err
+            onError(err)
+            return
+        }
+        if (!acceptedTerms) {
+            val err = "Tafadhali kubali Vigezo na Masharti (Please accept terms and conditions)"
+            _authError.value = err
+            onError(err)
+            return
+        }
+
+        setPendingRegistration(
+            name = trimmedName.ifBlank { trimmedEmail.substringBefore("@") },
+            phone = phone,
+            role = role,
+            acceptedTerms = acceptedTerms,
+            aiPreferredName = aiPreferredName
+        )
+
+        _isLoading.value = true
+        _authError.value = null
+        scope.launch {
+            try {
+                val result = auth.createUserWithEmailAndPassword(trimmedEmail, trimmedPassword).await()
+                val user = result.user
+                if (user != null) {
+                    // Update FirebaseUser display name if provided
+                    if (trimmedName.isNotBlank()) {
+                        try {
+                            val profileUpdates = com.google.firebase.auth.UserProfileChangeRequest.Builder()
+                                .setDisplayName(trimmedName)
+                                .build()
+                            user.updateProfile(profileUpdates).await()
+                        } catch (e: Exception) {
+                            Log.w("AuthManager", "Failed to update Firebase profile display name", e)
+                        }
+                    }
+                    _currentUser.value = user
+                    loadOrCreateUserProfile(user)
+                    onSuccess()
+                } else {
+                    val err = "Usajili umeshindwa (Registration failed)"
+                    _authError.value = err
+                    onError(err)
+                }
+            } catch (e: Exception) {
+                Log.e("AuthManager", "Email/Password registration failed", e)
+                val message = when {
+                    e.message?.contains("email-already-in-use", ignoreCase = true) == true ||
+                    e.message?.contains("already in use", ignoreCase = true) == true ->
+                        "Barua pepe hii tayari imesajiliwa. Tafadhali ingia (Email already in use. Please sign in)"
+                    e.message?.contains("weak-password", ignoreCase = true) == true ->
+                        "Nenosiri ni dhaifu. Tumia angalau herufi 6 (Weak password. Use at least 6 characters)"
+                    e.message?.contains("network", ignoreCase = true) == true ->
+                        "Hitilafu ya mtandao. Angalia muunganisho wako (Network failure)"
+                    else -> e.localizedMessage ?: "Usajili umeshindwa (Registration failed)"
+                }
+                _authError.value = message
+                onError(message)
+            } finally {
+                _isLoading.value = false
+            }
+        }
+    }
+
+    // Overload for backward compatibility with Activity callers
     fun registerStandard(
         activity: Activity,
         displayName: String,
@@ -169,6 +318,46 @@ class AuthManager(private val context: Context) {
             aiPreferredName = aiPreferredName
         )
         signInWithGoogle(activity, scope)
+    }
+
+    /**
+     * Password reset via FirebaseAuth.sendPasswordResetEmail
+     */
+    fun sendPasswordReset(
+        email: String,
+        scope: CoroutineScope,
+        onSuccess: () -> Unit = {},
+        onError: (String) -> Unit = {}
+    ) {
+        val trimmedEmail = email.trim()
+        if (trimmedEmail.isBlank()) {
+            val err = "Tafadhali weka barua pepe yako (Please enter your email)"
+            _authError.value = err
+            onError(err)
+            return
+        }
+
+        _isLoading.value = true
+        _authError.value = null
+        scope.launch {
+            try {
+                auth.sendPasswordResetEmail(trimmedEmail).await()
+                onSuccess()
+            } catch (e: Exception) {
+                Log.e("AuthManager", "Password reset failed", e)
+                val message = when {
+                    e.message?.contains("user-not-found", ignoreCase = true) == true ->
+                        "Hakuna akaunti yenye barua pepe hii (No account found for this email)"
+                    e.message?.contains("invalid-email", ignoreCase = true) == true ->
+                        "Barua pepe sio sahihi (Invalid email format)"
+                    else -> e.localizedMessage ?: "Imeshindikana kutuma barua pepe ya kurejesha nenosiri"
+                }
+                _authError.value = message
+                onError(message)
+            } finally {
+                _isLoading.value = false
+            }
+        }
     }
 
     private var pendingDisplayName: String? = null

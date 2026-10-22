@@ -48,6 +48,7 @@ import com.example.sokotz.data.model.AppLanguage
 import com.example.sokotz.data.repository.FirestoreMarketplaceRepository
 import com.example.sokotz.data.repository.MarketplaceData
 import com.example.sokotz.ui.components.ListingCard
+import com.example.ui.theme.SokoColors
 import com.example.ui.theme.SokoBlueBlack
 import com.example.ui.theme.SokoCardBorder
 import com.example.ui.theme.SokoDeepNavy
@@ -87,11 +88,11 @@ fun SearchScreen(
     Column(
         modifier = modifier
             .fillMaxSize()
-            .background(SokoBlueBlack)
+            .background(SokoColors.background)
             .testTag("search_screen")
     ) {
         // Search Input Header
-        Surface(color = SokoMidnightBlue, modifier = Modifier.fillMaxWidth()) {
+        Surface(color = SokoColors.headerSurface, modifier = Modifier.fillMaxWidth()) {
             Column(modifier = Modifier.padding(16.dp)) {
                 OutlinedTextField(
                     value = searchQuery,
@@ -99,7 +100,7 @@ fun SearchScreen(
                     placeholder = {
                         Text(
                             text = if (isSw) "Tafuta bidhaa, huduma, maduka..." else "Search products, services, shops...",
-                            color = SokoMutedText
+                            color = SokoColors.textMuted
                         )
                     },
                     leadingIcon = {
@@ -108,20 +109,20 @@ fun SearchScreen(
                     trailingIcon = {
                         if (searchQuery.isNotEmpty()) {
                             IconButton(onClick = { searchQuery = "" }) {
-                                Icon(Icons.Default.Clear, contentDescription = "Clear", tint = SokoMutedText)
+                                Icon(Icons.Default.Clear, contentDescription = "Clear", tint = SokoColors.textMuted)
                             }
                         }
                     },
                     modifier = Modifier
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(12.dp))
-                        .background(SokoDeepNavy)
+                        .background(SokoColors.inputBackground)
                         .testTag("search_screen_query_input"),
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedBorderColor = SokoNeonBlue,
-                        unfocusedBorderColor = SokoCardBorder,
-                        focusedTextColor = SokoLightText,
-                        unfocusedTextColor = SokoLightText
+                        unfocusedBorderColor = SokoColors.cardBorder,
+                        focusedTextColor = SokoColors.textPrimary,
+                        unfocusedTextColor = SokoColors.textPrimary
                     ),
                     singleLine = true
                 )
@@ -207,7 +208,7 @@ fun SearchScreen(
             Text(
                 text = if (isSw) "Matokeo yaliyopatikana (${filteredListings.size})" else "Found (${filteredListings.size}) results",
                 style = MaterialTheme.typography.titleMedium,
-                color = SokoLightText
+                color = SokoColors.textPrimary
             )
             if (selectedCategorySlug != "all" || selectedCity != "Tanzania Nzima" || selectedType != null || searchQuery.isNotBlank()) {
                 Text(
@@ -236,20 +237,20 @@ fun SearchScreen(
                     Icon(
                         imageVector = Icons.Default.SearchOff,
                         contentDescription = "No results",
-                        tint = SokoMutedText,
+                        tint = SokoColors.textMuted,
                         modifier = Modifier.size(64.dp)
                     )
                     Spacer(modifier = Modifier.height(16.dp))
                     Text(
                         text = if (isSw) "Hakuna matokeo yanayolingana" else "No matching results found",
                         style = MaterialTheme.typography.titleLarge,
-                        color = SokoLightText
+                        color = SokoColors.textPrimary
                     )
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
                         text = if (isSw) "Bado hakuna matangazo kwenye kategoria hii au mji huu." else "No listings yet in this category or region.",
                         style = MaterialTheme.typography.bodyMedium,
-                        color = SokoMutedText
+                        color = SokoColors.textMuted
                     )
                     Spacer(modifier = Modifier.height(20.dp))
                     Button(
@@ -297,8 +298,8 @@ fun FilterTypePill(
     Box(
         modifier = modifier
             .clip(RoundedCornerShape(8.dp))
-            .background(if (isSelected) SokoNeonBlue else SokoDeepNavy)
-            .border(1.dp, if (isSelected) SokoNeonBlue else SokoCardBorder, RoundedCornerShape(8.dp))
+            .background(if (isSelected) SokoNeonBlue else SokoColors.inputBackground)
+            .border(1.dp, if (isSelected) SokoNeonBlue else SokoColors.cardBorder, RoundedCornerShape(8.dp))
             .clickable { onClick() }
             .padding(vertical = 8.dp),
         contentAlignment = Alignment.Center
@@ -306,7 +307,7 @@ fun FilterTypePill(
         Text(
             text = text,
             style = MaterialTheme.typography.labelMedium.copy(fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal),
-            color = if (isSelected) SokoBlueBlack else SokoLightText
+            color = if (isSelected) SokoBlueBlack else SokoColors.textPrimary
         )
     }
 }
@@ -320,15 +321,15 @@ fun FilterChip(
     Box(
         modifier = Modifier
             .clip(RoundedCornerShape(16.dp))
-            .background(if (isSelected) SokoNeonViolet else SokoDeepNavy)
-            .border(1.dp, if (isSelected) SokoNeonViolet else SokoCardBorder, RoundedCornerShape(16.dp))
+            .background(if (isSelected) SokoNeonViolet else SokoColors.inputBackground)
+            .border(1.dp, if (isSelected) SokoNeonViolet else SokoColors.cardBorder, RoundedCornerShape(16.dp))
             .clickable { onClick() }
             .padding(horizontal = 12.dp, vertical = 6.dp)
     ) {
         Text(
             text = text,
             style = MaterialTheme.typography.bodySmall.copy(fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal),
-            color = if (isSelected) SokoLightText else SokoMutedText
+            color = if (isSelected) androidx.compose.ui.graphics.Color.White else SokoColors.textPrimary
         )
     }
 }

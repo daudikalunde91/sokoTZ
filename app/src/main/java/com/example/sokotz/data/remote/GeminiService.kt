@@ -89,10 +89,24 @@ object GeminiClient {
             ""
         }
 
+        val userWantsEmojis = userMessage.any { char ->
+            val type = Character.getType(char)
+            type == Character.SURROGATE.toInt() || type == Character.OTHER_SYMBOL.toInt()
+        } || userMessage.contains("emoji", ignoreCase = true) ||
+           userMessage.contains("emojis", ignoreCase = true) ||
+           userMessage.contains("imoj", ignoreCase = true)
+
+        val emojiRule = if (userWantsEmojis) {
+            "Mtumiaji anataka emoji. Unaweza kutumia emoji zinazofaa na zilizopangwa vizuri katika jibu lako."
+        } else {
+            "KANUNI YA MAANDISHI (MUHIMU SANA): Tumia MAANDISHI TU (ONLY TEXT BILA EMOJI ZOZOTE) kwa chaguo-msingi (default). Tumia imoji za furaha kumkaribisha mtumiaji ili ajihisi yupo sehemu sahihi na sio sehemu isiyo ahihi."
+        }
+
         val systemPrompt = """
             Wewe ni sokoTZ Msaidizi (sokoTZ AI) — msaidizi rasmi wa kidijitali wa jukwaa kuu la SokoTZ nchini Tanzania.
             Lugha zako kuu ni Kiswahili na Kiingereza. Jibu kwa ufasaha kulingana na lugha anayotumia mteja.
             $userGreetingInstruction
+            $emojiRule
             Majukumu yako:
             1. Kusaidia wanunuzi na wateja kupata biashara zilizothibitishwa, bidhaa za maduka ya Kariakoo, Arusha, Mwanza na nchi nzima.
             2. Kusaidia wafanyabiashara kutunga maelezo ya kuvutia ya matangazo (product sales copy).
@@ -145,11 +159,10 @@ object GeminiClient {
                         }
                     } catch (e: Exception) {
                         Log.w("GeminiService", "Attempt $attempts with $model failed: ${e.message}")
-                        // If 503 Service Unavailable or 429 Too Many Requests, short delay before next try
                         if (e.message?.contains("503") == true || e.message?.contains("429") == true) {
                             kotlinx.coroutines.delay(400)
                         } else {
-                            break // non-retryable for this model, try next model
+                            break
                         }
                     }
                 }
@@ -157,10 +170,10 @@ object GeminiClient {
         }
 
         // Resilient Fallback: Always returns an intelligent, structured response even if remote API returns 503
-        generateLocalAssistantResponse(trimmed, marketplaceContext)
+        generateLocalAssistantResponse(trimmed, marketplaceContext, userWantsEmojis)
     }
 
-    private fun generateLocalAssistantResponse(userMsg: String, context: String): String {
+    private fun generateLocalAssistantResponse(userMsg: String, context: String, allowEmojis: Boolean): String {
         val q = userMsg.lowercase()
         val isSw = !q.contains("hello") && !q.contains("price of") && !q.contains("what is") && !q.contains("how much")
 
@@ -168,47 +181,94 @@ object GeminiClient {
         if (q.contains("andika") || q.contains("tunga") || q.contains("draft") || q.contains("maelezo") || q.contains("tangazo")) {
             val subject = userMsg.replace(Regex("(?i)andika|tunga|tangazo|maelezo|draft|ya|kuhusu"), "").trim()
             return if (isSw) {
-                """
-                🔥 *Toleo Maalum SokoTZ: $subject* 🔥
+                if (allowEmojis) {
+                    """
+                    🔥 *Toleo Maalum SokoTZ: $subject* 🔥
 
-                Je, unatafuta ${subject.ifBlank { "bidhaa bora na yenye ubora wa hali ya juu" }} kwa bei nafuu nchini Tanzania?
-                ✨ Ubora wa kuaminika na warranty.
-                🚚 Usafirishaji unafanyika mikoa yote ya Tanzania (Dar es Salaam, Arusha, Mwanza, Dodoma na kwingineko).
-                📞 Wasiliana nasi sasa kwa simu au WhatsApp kupitia namba zetu zilizopo kwenye duka kupata ofa maalum ya leo!
+                    Je, unatafuta ${subject.ifBlank { "bidhaa bora na yenye ubora wa hali ya juu" }} kwa bei nafuu nchini Tanzania?
+                    ✨ Ubora wa kuaminika na warranty.
+                    🚚 Usafirishaji unafanyika mikoa yote ya Tanzania (Dar es Salaam, Arusha, Mwanza, Dodoma na kwingineko).
+                    📞 Wasiliana nasi sasa kwa simu au WhatsApp kupitia namba zetu zilizopo kwenye duka kupata ofa maalum ya leo!
 
-                _SokoTZ — Soko Lako la Kidijitali Tanzania._
-                """.trimIndent()
+                    _SokoTZ — Soko Lako la Kidijitali Tanzania._
+                    """.trimIndent()
+                } else {
+                    """
+                    [Toleo Maalum SokoTZ: $subject]
+
+                    Je, unatafuta ${subject.ifBlank { "bidhaa bora na yenye ubora wa hali ya juu" }} kwa bei nafuu nchini Tanzania?
+                    - Ubora wa kuaminika na uhakika.
+                    - Usafirishaji unafanyika mikoa yote ya Tanzania (Dar es Salaam, Arusha, Mwanza, Dodoma na kwingineko).
+                    - Wasiliana nasi sasa kwa simu au WhatsApp kupitia namba zetu zilizopo kwenye tangazo hili kupata bei bora ya leo.
+
+                    SokoTZ — Soko Lako Kuu la Kidijitali Tanzania.
+                    """.trimIndent()
+                }
             } else {
-                """
-                🔥 *Hot Deal on SokoTZ: $subject* 🔥
+                if (allowEmojis) {
+                    """
+                    🔥 *Hot Deal on SokoTZ: $subject* 🔥
 
-                Looking for premium quality ${subject.ifBlank { "authentic products" }} in Tanzania?
-                ✨ High quality, verified sellers, and great customer care.
-                🚚 Nationwide delivery across Tanzania.
-                📞 Tap the Call or WhatsApp button on this listing now to secure yours today!
+                    Looking for premium quality ${subject.ifBlank { "authentic products" }} in Tanzania?
+                    ✨ High quality, verified sellers, and great customer care.
+                    🚚 Nationwide delivery across Tanzania.
+                    📞 Tap the Call or WhatsApp button on this listing now to secure yours today!
 
-                _SokoTZ — Tanzania's Premier Marketplace._
-                """.trimIndent()
+                    _SokoTZ — Tanzania's Premier Marketplace._
+                    """.trimIndent()
+                } else {
+                    """
+                    [Special Offer on SokoTZ: $subject]
+
+                    Looking for premium quality ${subject.ifBlank { "authentic products" }} in Tanzania?
+                    - Verified sellers and dependable quality.
+                    - Nationwide delivery across Tanzania (Dar es Salaam, Arusha, Mwanza, Dodoma and beyond).
+                    - Contact the seller directly via Call or WhatsApp on this listing to order today.
+
+                    SokoTZ — Tanzania Premier Online Marketplace.
+                    """.trimIndent()
+                }
             }
         }
 
         // Inquiry about businesses or products
         return if (isSw) {
-            """
-            Habari! Mimi ni sokoTZ Msaidizi. 
-            Niko hapa kukusaidia kupata wauzaji waaminifu, bidhaa halisi za Kariakoo na mikoani, pamoja na kutoa maelezo ya kina ya bei katika Shilingi ya Kitanzania (TZS).
+            if (allowEmojis) {
+                """
+                Habari! Mimi ni sokoTZ Msaidizi. 
+                Niko hapa kukusaidia kupata wauzaji waaminifu, bidhaa halisi za Kariakoo na mikoani, pamoja na kutoa maelezo ya kina ya bei katika Shilingi ya Kitanzania (TZS).
 
-            Unaweza kunitumia jina la bidhaa (k.m. "simu ya Samsung", "nguo za kike", "spea za gari") au kuniomba:
-            👉 *"Nitafutie maduka ya elektroniki Kariakoo"*
-            👉 *"Andika maelezo ya tangazo la viatu"*
-            """.trimIndent()
+                Unaweza kunitumia jina la bidhaa au kuniomba:
+                👉 "Nitafutie maduka ya elektroniki Kariakoo"
+                👉 "Andika maelezo ya tangazo la viatu"
+                """.trimIndent()
+            } else {
+                """
+                Habari! Mimi ni sokoTZ Msaidizi.
+                Niko hapa kukusaidia kupata wauzaji waaminifu, bidhaa halisi za maduka ya Kariakoo na mikoani kote Tanzania, pamoja na kutoa maelezo ya kina ya bei katika Shilingi ya Kitanzania (TZS).
+
+                Unaweza kunitumia jina la bidhaa au kuniomba:
+                - "Nitafutie maduka ya elektroniki Kariakoo"
+                - "Andika maelezo ya tangazo la viatu"
+                - "Bei za vifaa vya ujenzi Mwanza"
+                """.trimIndent()
+            }
         } else {
-            """
-            Hello! I am sokoTZ AI.
-            I can help you find verified sellers, authentic products across Kariakoo and Tanzanian regions, and check prices in Tanzanian Shillings (TZS).
+            if (allowEmojis) {
+                """
+                Hello! I am sokoTZ AI.
+                I can help you find verified sellers, authentic products across Kariakoo and Tanzanian regions, and check prices in Tanzanian Shillings (TZS).
 
-            Feel free to ask me to search the catalog or generate sales copy for your store!
-            """.trimIndent()
+                Feel free to ask me to search the catalog or generate sales copy for your store!
+                """.trimIndent()
+            } else {
+                """
+                Hello! I am sokoTZ AI.
+                I can help you find verified sellers, authentic products across Kariakoo and Tanzanian regions, and check prices in Tanzanian Shillings (TZS).
+
+                Feel free to ask me to search the marketplace catalog or draft sales copy for your store.
+                """.trimIndent()
+            }
         }
     }
 }

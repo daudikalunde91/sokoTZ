@@ -60,6 +60,7 @@ import com.example.sokotz.data.repository.FirestoreMarketplaceRepository
 import com.example.sokotz.data.repository.MarketplaceData
 import com.example.sokotz.ui.components.BusinessCard
 import com.example.sokotz.ui.components.ListingCard
+import com.example.ui.theme.SokoColors
 import com.example.ui.theme.SokoBlueBlack
 import com.example.ui.theme.SokoCardBorder
 import com.example.ui.theme.SokoCardSurface
@@ -96,7 +97,7 @@ fun DiscoverScreen(
     LazyColumn(
         modifier = modifier
             .fillMaxSize()
-            .background(SokoBlueBlack)
+            .background(SokoColors.background)
             .testTag("discover_screen"),
         contentPadding = PaddingValues(bottom = 24.dp)
     ) {
@@ -105,7 +106,7 @@ fun DiscoverScreen(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(SokoGradients.HeroGradient)
+                    .background(SokoColors.heroGradient)
                     .padding(16.dp)
             ) {
                 Column {
@@ -118,7 +119,7 @@ fun DiscoverScreen(
                             Text(
                                 text = if (isSw) "Karibu SokoTZ" else "Welcome to SokoTZ",
                                 style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.ExtraBold),
-                                color = SokoLightText
+                                color = SokoColors.textPrimary
                             )
                             Spacer(modifier = Modifier.height(4.dp))
                             Text(
@@ -157,7 +158,7 @@ fun DiscoverScreen(
                         placeholder = {
                             Text(
                                 text = if (isSw) "Tafuta bidhaa, huduma, maduka..." else "Search products, services, stores...",
-                                color = SokoMutedText,
+                                color = SokoColors.textMuted,
                                 style = MaterialTheme.typography.bodyMedium
                             )
                         },
@@ -180,13 +181,13 @@ fun DiscoverScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clip(RoundedCornerShape(12.dp))
-                            .background(SokoDeepNavy)
+                            .background(SokoColors.inputBackground)
                             .testTag("home_search_input"),
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedBorderColor = SokoNeonBlue,
-                            unfocusedBorderColor = SokoCardBorder,
-                            focusedTextColor = SokoLightText,
-                            unfocusedTextColor = SokoLightText
+                            unfocusedBorderColor = SokoColors.cardBorder,
+                            focusedTextColor = SokoColors.textPrimary,
+                            unfocusedTextColor = SokoColors.textPrimary
                         ),
                         singleLine = true
                     )
@@ -201,7 +202,7 @@ fun DiscoverScreen(
                                 .clip(RoundedCornerShape(12.dp))
                                 .border(1.dp, SokoNeonBlue.copy(alpha = 0.5f), RoundedCornerShape(12.dp))
                                 .testTag("guest_landing_banner"),
-                            colors = CardDefaults.cardColors(containerColor = SokoMidnightBlue)
+                            colors = CardDefaults.cardColors(containerColor = SokoColors.cardSurface)
                         ) {
                             Column(modifier = Modifier.padding(14.dp)) {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -210,7 +211,7 @@ fun DiscoverScreen(
                                     Text(
                                         text = if (isSw) "Karibu Mteja! Gundua & Nunua Bila Akaunti" else "Welcome Shopper! Browse Free Without Sign-In",
                                         style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
-                                        color = SokoLightText
+                                        color = SokoColors.textPrimary
                                     )
                                 }
                                 Spacer(modifier = Modifier.height(4.dp))
@@ -220,7 +221,7 @@ fun DiscoverScreen(
                                     else
                                         "Explore all listings and contact sellers directly without restriction. To post listings or use sokoTZ AI, sign in here:",
                                     style = MaterialTheme.typography.bodySmall,
-                                    color = SokoMutedText
+                                    color = SokoColors.textMuted
                                 )
                                 Spacer(modifier = Modifier.height(10.dp))
                                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -264,7 +265,7 @@ fun DiscoverScreen(
                             .border(1.dp, SokoNeonViolet.copy(alpha = 0.5f), RoundedCornerShape(12.dp))
                             .clickable { onNavigateToAssistant() }
                             .testTag("assistant_banner_card"),
-                        colors = CardDefaults.cardColors(containerColor = SokoMidnightBlue)
+                        colors = CardDefaults.cardColors(containerColor = SokoColors.cardSurface)
                     ) {
                         Row(
                             modifier = Modifier
@@ -286,12 +287,12 @@ fun DiscoverScreen(
                                 Text(
                                     text = if (isSw) "sokoTZ Msaidizi" else "sokoTZ AI",
                                     style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                                    color = SokoLightText
+                                    color = SokoColors.textPrimary
                                 )
                                 Text(
                                     text = if (isSw) "Ongea na sokoTZ Msaidizi kwa Kiswahili au Kiingereza" else "Intelligent sokoTZ AI chat for Tanzanian business discovery",
                                     style = MaterialTheme.typography.bodySmall,
-                                    color = SokoMutedText
+                                    color = SokoColors.textMuted
                                 )
                             }
                             Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = "Go", tint = SokoNeonViolet)
@@ -310,7 +311,7 @@ fun DiscoverScreen(
                     Text(
                         text = if (isSw) "Chagua Eneo / Mkoa:" else "Filter by Region:",
                         style = MaterialTheme.typography.labelLarge,
-                        color = SokoLightText
+                        color = SokoColors.textPrimary
                     )
                 }
                 Spacer(modifier = Modifier.height(8.dp))
@@ -325,8 +326,8 @@ fun DiscoverScreen(
                         Box(
                             modifier = Modifier
                                 .clip(RoundedCornerShape(20.dp))
-                                .background(if (isSelected) SokoNeonBlue else SokoDeepNavy)
-                                .border(1.dp, if (isSelected) SokoNeonBlue else SokoCardBorder, RoundedCornerShape(20.dp))
+                                .background(if (isSelected) SokoNeonBlue else SokoColors.inputBackground)
+                                .border(1.dp, if (isSelected) SokoNeonBlue else SokoColors.cardBorder, RoundedCornerShape(20.dp))
                                 .clickable { selectedRegion = region }
                                 .padding(horizontal = 14.dp, vertical = 8.dp)
                                 .testTag("region_chip_$region")
@@ -334,7 +335,7 @@ fun DiscoverScreen(
                             Text(
                                 text = region,
                                 style = MaterialTheme.typography.bodySmall.copy(fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal),
-                                color = if (isSelected) SokoBlueBlack else SokoLightText
+                                color = if (isSelected) SokoBlueBlack else SokoColors.textPrimary
                             )
                         }
                     }
@@ -354,7 +355,7 @@ fun DiscoverScreen(
                     Text(
                         text = if (isSw) "Makundi ya Biashara" else "Marketplace Categories",
                         style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
-                        color = SokoLightText
+                        color = SokoColors.textPrimary
                     )
                     Text(
                         text = if (isSw) "Yote (${categories.size})" else "All (${categories.size})",
@@ -390,7 +391,7 @@ fun DiscoverScreen(
                     Text(
                         text = if (isSw) "Biashara Zilizosajiliwa (${businesses.size})" else "Registered Businesses (${businesses.size})",
                         style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
-                        color = SokoLightText
+                        color = SokoColors.textPrimary
                     )
                 }
                 Spacer(modifier = Modifier.height(12.dp))
@@ -407,8 +408,8 @@ fun DiscoverScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 16.dp, vertical = 8.dp)
-                        .border(1.dp, SokoCardBorder, RoundedCornerShape(12.dp)),
-                    colors = CardDefaults.cardColors(containerColor = SokoCardSurface)
+                        .border(1.dp, SokoColors.cardBorder, RoundedCornerShape(12.dp)),
+                    colors = CardDefaults.cardColors(containerColor = SokoColors.cardSurface)
                 ) {
                     Column(
                         modifier = Modifier.padding(20.dp),
@@ -418,14 +419,14 @@ fun DiscoverScreen(
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(
                             text = if (isSw) "Bado hakuna biashara iliyosajiliwa hapa." else "No live businesses registered in this area yet.",
-                            color = SokoLightText,
+                            color = SokoColors.textPrimary,
                             fontWeight = FontWeight.SemiBold,
                             style = MaterialTheme.typography.bodyMedium
                         )
                         Spacer(modifier = Modifier.height(6.dp))
                         Text(
                             text = if (isSw) "Kuwa wa kwanza kusajili biashara yako leo bure!" else "Be the first to register your business on SokoTZ!",
-                            color = SokoMutedText,
+                            color = SokoColors.textMuted,
                             style = MaterialTheme.typography.bodySmall
                         )
                         Spacer(modifier = Modifier.height(12.dp))
@@ -462,7 +463,7 @@ fun DiscoverScreen(
                     Text(
                         text = if (isSw) "Bidhaa & Huduma Hai (${listings.size})" else "Active Marketplace Listings (${listings.size})",
                         style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
-                        color = SokoLightText
+                        color = SokoColors.textPrimary
                     )
                     Text(
                         text = if (isSw) "Tazama Zote" else "View All",
@@ -485,8 +486,8 @@ fun DiscoverScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 16.dp, vertical = 8.dp)
-                        .border(1.dp, SokoCardBorder, RoundedCornerShape(12.dp)),
-                    colors = CardDefaults.cardColors(containerColor = SokoCardSurface)
+                        .border(1.dp, SokoColors.cardBorder, RoundedCornerShape(12.dp)),
+                    colors = CardDefaults.cardColors(containerColor = SokoColors.cardSurface)
                 ) {
                     Column(
                         modifier = Modifier.padding(20.dp),
@@ -494,7 +495,7 @@ fun DiscoverScreen(
                     ) {
                         Text(
                             text = if (isSw) "Bado hakuna matangazo yaliyochapishwa." else "No live listings published yet.",
-                            color = SokoMutedText,
+                            color = SokoColors.textMuted,
                             style = MaterialTheme.typography.bodyMedium
                         )
                         Spacer(modifier = Modifier.height(10.dp))
@@ -531,10 +532,10 @@ fun CategoryCard(
         modifier = Modifier
             .width(135.dp)
             .clip(RoundedCornerShape(12.dp))
-            .border(1.dp, SokoCardBorder, RoundedCornerShape(12.dp))
+            .border(1.dp, SokoColors.cardBorder, RoundedCornerShape(12.dp))
             .clickable { onClick() }
             .testTag("category_card_${category.slug}"),
-        colors = CardDefaults.cardColors(containerColor = SokoCardSurface)
+        colors = CardDefaults.cardColors(containerColor = SokoColors.cardSurface)
     ) {
         Column(
             modifier = Modifier.padding(12.dp),
@@ -544,7 +545,7 @@ fun CategoryCard(
                 modifier = Modifier
                     .size(36.dp)
                     .clip(RoundedCornerShape(8.dp))
-                    .background(SokoMidnightBlue),
+                    .background(if (SokoColors.isDark) SokoMidnightBlue else MaterialTheme.colorScheme.primaryContainer),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
@@ -558,7 +559,7 @@ fun CategoryCard(
             Text(
                 text = category.localizedName(language),
                 style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
-                color = SokoLightText,
+                color = SokoColors.textPrimary,
                 maxLines = 2
             )
         }

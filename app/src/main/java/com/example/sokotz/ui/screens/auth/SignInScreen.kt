@@ -88,6 +88,7 @@ import com.example.sokotz.data.model.AppLanguage
 import com.example.ui.theme.SokoBlueBlack
 import com.example.ui.theme.SokoCardBorder
 import com.example.ui.theme.SokoCardSurface
+import com.example.ui.theme.SokoColors
 import com.example.ui.theme.SokoDeepNavy
 import com.example.ui.theme.SokoError
 import com.example.ui.theme.SokoGradients
@@ -121,7 +122,9 @@ fun SignInScreen(
     var registerEmail by remember { mutableStateOf("") }
     var registerPhone by remember { mutableStateOf("") }
     var registerPassword by remember { mutableStateOf("") }
+    var registerConfirmPassword by remember { mutableStateOf("") }
     var isPasswordVisible by remember { mutableStateOf(false) }
+    var isConfirmPasswordVisible by remember { mutableStateOf(false) }
     var registerRole by remember { mutableStateOf("CUSTOMER") }
     var hasAcceptedTerms by remember { mutableStateOf(false) }
 
@@ -132,10 +135,17 @@ fun SignInScreen(
     var validationError by remember { mutableStateOf<String?>(null) }
     var showTermsDialog by remember { mutableStateOf(false) }
 
+    // Password Reset States
+    var showResetDialog by remember { mutableStateOf(false) }
+    var resetEmail by remember { mutableStateOf("") }
+    var resetStatusMessage by remember { mutableStateOf<String?>(null) }
+    var resetErrorMessage by remember { mutableStateOf<String?>(null) }
+    var isResetLoading by remember { mutableStateOf(false) }
+
     Box(
         modifier = modifier
             .fillMaxSize()
-            .background(SokoBlueBlack)
+            .background(SokoColors.background)
             .statusBarsPadding()
             .navigationBarsPadding(),
         contentAlignment = Alignment.TopCenter
@@ -160,7 +170,7 @@ fun SignInScreen(
                     onClick = onToggleLanguage,
                     shape = RoundedCornerShape(20.dp),
                     border = androidx.compose.foundation.BorderStroke(1.dp, SokoNeonBlue.copy(alpha = 0.5f)),
-                    colors = ButtonDefaults.outlinedButtonColors(containerColor = SokoMidnightBlue),
+                    colors = ButtonDefaults.outlinedButtonColors(containerColor = SokoColors.surface),
                     modifier = Modifier.height(36.dp)
                 ) {
                     Icon(
@@ -172,7 +182,7 @@ fun SignInScreen(
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(
                         text = if (isSw) "Kiswahili" else "English",
-                        color = SokoLightText,
+                        color = SokoColors.textPrimary,
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Bold
                     )
@@ -200,7 +210,7 @@ fun SignInScreen(
             Text(
                 text = "SokoTZ",
                 style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Black),
-                color = SokoLightText
+                color = SokoColors.textPrimary
             )
 
             Text(
@@ -215,7 +225,7 @@ fun SignInScreen(
             // Tab Switcher: Ingia (Sign In) vs Sajili (Register)
             TabRow(
                 selectedTabIndex = selectedTab,
-                containerColor = SokoMidnightBlue,
+                containerColor = SokoColors.inputBackground,
                 contentColor = SokoNeonBlue,
                 indicator = { tabPositions ->
                     TabRowDefaults.SecondaryIndicator(
@@ -227,7 +237,7 @@ fun SignInScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(12.dp))
-                    .border(1.dp, SokoCardBorder, RoundedCornerShape(12.dp))
+                    .border(1.dp, SokoColors.cardBorder, RoundedCornerShape(12.dp))
             ) {
                 Tab(
                     selected = selectedTab == 0,
@@ -240,7 +250,7 @@ fun SignInScreen(
                         Text(
                             text = if (isSw) "Ingia (Sign In)" else "Sign In",
                             fontWeight = if (selectedTab == 0) FontWeight.Bold else FontWeight.Normal,
-                            color = if (selectedTab == 0) SokoNeonBlue else SokoMutedText,
+                            color = if (selectedTab == 0) SokoNeonBlue else SokoColors.textMuted,
                             fontSize = 13.sp
                         )
                     },
@@ -258,7 +268,7 @@ fun SignInScreen(
                         Text(
                             text = if (isSw) "Sajili Akaunti" else "Register",
                             fontWeight = if (selectedTab == 1) FontWeight.Bold else FontWeight.Normal,
-                            color = if (selectedTab == 1) SokoNeonBlue else SokoMutedText,
+                            color = if (selectedTab == 1) SokoNeonBlue else SokoColors.textMuted,
                             fontSize = 13.sp
                         )
                     },
@@ -273,8 +283,8 @@ fun SignInScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(18.dp))
-                    .border(1.dp, SokoCardBorder, RoundedCornerShape(18.dp)),
-                colors = CardDefaults.cardColors(containerColor = SokoCardSurface)
+                    .border(1.dp, SokoColors.cardBorder, RoundedCornerShape(18.dp)),
+                colors = CardDefaults.cardColors(containerColor = SokoColors.cardSurface)
             ) {
                 Column(
                     modifier = Modifier
@@ -306,17 +316,18 @@ fun SignInScreen(
                         Text(
                             text = if (isSw) "Karibu tena kwenye SokoTZ" else "Welcome back to SokoTZ",
                             style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                            color = SokoLightText
+                            color = SokoColors.textPrimary
                         )
 
                         OutlinedTextField(
                             value = signInEmail,
                             onValueChange = { signInEmail = it; validationError = null },
-                            label = { Text(if (isSw) "Barua Pepe au Simu" else "Email or Phone") },
+                            label = { Text(if (isSw) "Barua Pepe" else "Email Address") },
                             leadingIcon = { Icon(Icons.Default.Email, contentDescription = null, tint = SokoNeonBlue) },
                             singleLine = true,
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
                             colors = authTextFieldColors(),
-                            modifier = Modifier.fillMaxWidth()
+                            modifier = Modifier.fillMaxWidth().testTag("signin_email_input")
                         )
 
                         OutlinedTextField(
@@ -329,7 +340,7 @@ fun SignInScreen(
                                     Icon(
                                         imageVector = if (isSignInPasswordVisible) Icons.Default.VisibilityOff else Icons.Default.Visibility,
                                         contentDescription = "Toggle password",
-                                        tint = SokoMutedText
+                                        tint = SokoColors.textMuted
                                     )
                                 }
                             },
@@ -337,8 +348,29 @@ fun SignInScreen(
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
                             singleLine = true,
                             colors = authTextFieldColors(),
-                            modifier = Modifier.fillMaxWidth()
+                            modifier = Modifier.fillMaxWidth().testTag("signin_password_input")
                         )
+
+                        // Forgot Password Link
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.End
+                        ) {
+                            Text(
+                                text = if (isSw) "Umesahau Nenosiri?" else "Forgot Password?",
+                                color = SokoNeonBlue,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                modifier = Modifier
+                                    .clickable {
+                                        resetEmail = signInEmail.trim()
+                                        resetStatusMessage = null
+                                        resetErrorMessage = null
+                                        showResetDialog = true
+                                    }
+                                    .testTag("forgot_password_button")
+                            )
+                        }
 
                         // Standard sign-in action button
                         Button(
@@ -347,9 +379,12 @@ fun SignInScreen(
                                     validationError = if (isSw) "Tafadhali weka barua pepe na nenosiri" else "Please enter email and password"
                                     return@Button
                                 }
-                                if (context is Activity) {
-                                    authManager.signInStandard(context, signInEmail, scope)
-                                }
+                                authManager.signInStandard(
+                                    email = signInEmail.trim(),
+                                    password = signInPassword,
+                                    scope = scope,
+                                    onError = { validationError = it }
+                                )
                             },
                             enabled = !isLoading,
                             colors = ButtonDefaults.buttonColors(containerColor = SokoNeonBlue),
@@ -374,14 +409,14 @@ fun SignInScreen(
                                 .padding(vertical = 4.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            HorizontalDivider(modifier = Modifier.weight(1f), color = SokoCardBorder)
+                            HorizontalDivider(modifier = Modifier.weight(1f), color = SokoColors.cardBorder)
                             Text(
                                 text = if (isSw) " AU " else " OR ",
-                                color = SokoMutedText,
+                                color = SokoColors.textMuted,
                                 fontSize = 11.sp,
                                 modifier = Modifier.padding(horizontal = 8.dp)
                             )
-                            HorizontalDivider(modifier = Modifier.weight(1f), color = SokoCardBorder)
+                            HorizontalDivider(modifier = Modifier.weight(1f), color = SokoColors.cardBorder)
                         }
 
                         // Google Sign-In Button
@@ -400,7 +435,7 @@ fun SignInScreen(
                         Text(
                             text = if (isSw) "Unda Akaunti Mpya ya SokoTZ" else "Create New SokoTZ Account",
                             style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                            color = SokoLightText
+                            color = SokoColors.textPrimary
                         )
 
                         OutlinedTextField(
@@ -431,19 +466,19 @@ fun SignInScreen(
                             singleLine = true,
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
                             colors = authTextFieldColors(),
-                            modifier = Modifier.fillMaxWidth()
+                            modifier = Modifier.fillMaxWidth().testTag("register_email_input")
                         )
 
                         OutlinedTextField(
                             value = registerPhone,
                             onValueChange = { registerPhone = it; validationError = null },
                             label = { Text(if (isSw) "Namba ya Simu / WhatsApp" else "Phone / WhatsApp Number") },
-                            placeholder = { Text("+255 7XX XXX XXX", color = SokoMutedText.copy(alpha = 0.5f)) },
+                            placeholder = { Text("+255 7XX XXX XXX", color = SokoColors.textMuted.copy(alpha = 0.5f)) },
                             leadingIcon = { Icon(Icons.Default.Phone, contentDescription = null, tint = SokoNeonBlue) },
                             singleLine = true,
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
                             colors = authTextFieldColors(),
-                            modifier = Modifier.fillMaxWidth()
+                            modifier = Modifier.fillMaxWidth().testTag("register_phone_input")
                         )
 
                         OutlinedTextField(
@@ -456,7 +491,7 @@ fun SignInScreen(
                                     Icon(
                                         imageVector = if (isPasswordVisible) Icons.Default.VisibilityOff else Icons.Default.Visibility,
                                         contentDescription = "Toggle password",
-                                        tint = SokoMutedText
+                                        tint = SokoColors.textMuted
                                     )
                                 }
                             },
@@ -464,14 +499,35 @@ fun SignInScreen(
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
                             singleLine = true,
                             colors = authTextFieldColors(),
-                            modifier = Modifier.fillMaxWidth()
+                            modifier = Modifier.fillMaxWidth().testTag("register_password_input")
+                        )
+
+                        OutlinedTextField(
+                            value = registerConfirmPassword,
+                            onValueChange = { registerConfirmPassword = it; validationError = null },
+                            label = { Text(if (isSw) "Thibitisha Nenosiri" else "Confirm Password") },
+                            leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null, tint = SokoNeonBlue) },
+                            trailingIcon = {
+                                IconButton(onClick = { isConfirmPasswordVisible = !isConfirmPasswordVisible }) {
+                                    Icon(
+                                        imageVector = if (isConfirmPasswordVisible) Icons.Default.VisibilityOff else Icons.Default.Visibility,
+                                        contentDescription = "Toggle confirm password",
+                                        tint = SokoColors.textMuted
+                                    )
+                                }
+                            },
+                            visualTransformation = if (isConfirmPasswordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                            singleLine = true,
+                            colors = authTextFieldColors(),
+                            modifier = Modifier.fillMaxWidth().testTag("register_confirm_password_input")
                         )
 
                         // Role Selector
                         Text(
                             text = if (isSw) "Aina ya Akaunti:" else "Account Type:",
                             style = MaterialTheme.typography.bodySmall,
-                            color = SokoMutedText,
+                            color = SokoColors.textMuted,
                             modifier = Modifier.align(Alignment.Start)
                         )
 
@@ -486,17 +542,17 @@ fun SignInScreen(
                                 shape = RoundedCornerShape(8.dp),
                                 border = androidx.compose.foundation.BorderStroke(
                                     1.dp,
-                                    if (isCustomer) SokoNeonBlue else SokoCardBorder
+                                    if (isCustomer) SokoNeonBlue else SokoColors.cardBorder
                                 ),
                                 colors = ButtonDefaults.outlinedButtonColors(
-                                    containerColor = if (isCustomer) SokoDeepNavy else Color.Transparent
+                                    containerColor = if (isCustomer) SokoNeonBlue.copy(alpha = 0.15f) else Color.Transparent
                                 )
                             ) {
-                                Icon(Icons.Default.ShoppingCart, contentDescription = null, tint = if (isCustomer) SokoNeonBlue else SokoMutedText, modifier = Modifier.size(16.dp))
+                                Icon(Icons.Default.ShoppingCart, contentDescription = null, tint = if (isCustomer) SokoNeonBlue else SokoColors.textMuted, modifier = Modifier.size(16.dp))
                                 Spacer(modifier = Modifier.width(6.dp))
                                 Text(
                                     text = if (isSw) "Mnunuzi" else "Buyer",
-                                    color = if (isCustomer) SokoNeonBlue else SokoMutedText,
+                                    color = if (isCustomer) SokoNeonBlue else SokoColors.textMuted,
                                     fontSize = 12.sp,
                                     fontWeight = if (isCustomer) FontWeight.Bold else FontWeight.Normal
                                 )
@@ -508,17 +564,17 @@ fun SignInScreen(
                                 shape = RoundedCornerShape(8.dp),
                                 border = androidx.compose.foundation.BorderStroke(
                                     1.dp,
-                                    if (!isCustomer) SokoNeonViolet else SokoCardBorder
+                                    if (!isCustomer) SokoNeonViolet else SokoColors.cardBorder
                                 ),
                                 colors = ButtonDefaults.outlinedButtonColors(
-                                    containerColor = if (!isCustomer) SokoDeepNavy else Color.Transparent
+                                    containerColor = if (!isCustomer) SokoNeonViolet.copy(alpha = 0.15f) else Color.Transparent
                                 )
                             ) {
-                                Icon(Icons.Default.Storefront, contentDescription = null, tint = if (!isCustomer) SokoNeonViolet else SokoMutedText, modifier = Modifier.size(16.dp))
+                                Icon(Icons.Default.Storefront, contentDescription = null, tint = if (!isCustomer) SokoNeonViolet else SokoColors.textMuted, modifier = Modifier.size(16.dp))
                                 Spacer(modifier = Modifier.width(6.dp))
                                 Text(
                                     text = if (isSw) "Muuzaji" else "Seller",
-                                    color = if (!isCustomer) SokoNeonViolet else SokoMutedText,
+                                    color = if (!isCustomer) SokoNeonViolet else SokoColors.textMuted,
                                     fontSize = 12.sp,
                                     fontWeight = if (!isCustomer) FontWeight.Bold else FontWeight.Normal
                                 )
@@ -537,7 +593,7 @@ fun SignInScreen(
                                 onCheckedChange = { hasAcceptedTerms = it; validationError = null },
                                 colors = CheckboxDefaults.colors(
                                     checkedColor = SokoNeonBlue,
-                                    uncheckedColor = SokoMutedText,
+                                    uncheckedColor = SokoColors.textMuted,
                                     checkmarkColor = SokoBlueBlack
                                 ),
                                 modifier = Modifier.testTag("terms_checkbox")
@@ -546,7 +602,7 @@ fun SignInScreen(
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(
                                     text = if (isSw) "Ninakubali Vigezo na Masharti ya SokoTZ" else "I accept SokoTZ Terms and Conditions",
-                                    color = SokoLightText,
+                                    color = SokoColors.textPrimary,
                                     fontSize = 12.sp,
                                     fontWeight = FontWeight.Medium
                                 )
@@ -588,18 +644,22 @@ fun SignInScreen(
                                     validationError = if (isSw) "Nenosiri lazima liwe na angalau tarakimu 6." else "Password must be at least 6 characters."
                                     return@Button
                                 }
-
-                                if (context is Activity) {
-                                    authManager.registerStandard(
-                                        activity = context,
-                                        displayName = registerName,
-                                        phone = registerPhone,
-                                        role = registerRole,
-                                        acceptedTerms = hasAcceptedTerms,
-                                        scope = scope,
-                                        aiPreferredName = registerAiName.ifBlank { registerName }
-                                    )
+                                if (registerPassword != registerConfirmPassword) {
+                                    validationError = if (isSw) "Nenosiri hazilingani. Tafadhali hakiki tena." else "Passwords do not match. Please verify."
+                                    return@Button
                                 }
+
+                                authManager.registerStandard(
+                                    email = registerEmail.trim(),
+                                    password = registerPassword,
+                                    displayName = registerName.trim(),
+                                    phone = registerPhone.trim(),
+                                    role = registerRole,
+                                    acceptedTerms = hasAcceptedTerms,
+                                    scope = scope,
+                                    aiPreferredName = registerAiName.trim().ifBlank { registerName.trim() },
+                                    onError = { validationError = it }
+                                )
                             },
                             enabled = !isLoading,
                             colors = ButtonDefaults.buttonColors(containerColor = SokoNeonBlue),
@@ -624,14 +684,14 @@ fun SignInScreen(
                                 .padding(vertical = 4.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            HorizontalDivider(modifier = Modifier.weight(1f), color = SokoCardBorder)
+                            HorizontalDivider(modifier = Modifier.weight(1f), color = SokoColors.cardBorder)
                             Text(
                                 text = if (isSw) " AU SAJILI KWA " else " OR REGISTER WITH ",
-                                color = SokoMutedText,
+                                color = SokoColors.textMuted,
                                 fontSize = 11.sp,
                                 modifier = Modifier.padding(horizontal = 6.dp)
                             )
-                            HorizontalDivider(modifier = Modifier.weight(1f), color = SokoCardBorder)
+                            HorizontalDivider(modifier = Modifier.weight(1f), color = SokoColors.cardBorder)
                         }
 
                         // Google Sign-In / Register Button
@@ -669,7 +729,7 @@ fun SignInScreen(
                     onClick = onContinueAsGuest,
                     shape = RoundedCornerShape(12.dp),
                     border = androidx.compose.foundation.BorderStroke(1.dp, SokoNeonBlue.copy(alpha = 0.5f)),
-                    colors = ButtonDefaults.outlinedButtonColors(containerColor = SokoMidnightBlue),
+                    colors = ButtonDefaults.outlinedButtonColors(containerColor = SokoColors.surface),
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(48.dp)
@@ -679,7 +739,7 @@ fun SignInScreen(
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
                         text = if (isSw) "Chunguza SokoTZ Kama Mgeni (Bila Kuingia)" else "Browse SokoTZ as Guest (Without Signing In)",
-                        color = SokoLightText,
+                        color = SokoColors.textPrimary,
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Bold
                     )
@@ -709,6 +769,131 @@ fun SignInScreen(
                 )
             }
         }
+    }
+
+    // FORGOT PASSWORD DIALOG
+    if (showResetDialog) {
+        AlertDialog(
+            onDismissRequest = {
+                if (!isResetLoading) showResetDialog = false
+            },
+            containerColor = SokoColors.surface,
+            titleContentColor = SokoColors.textPrimary,
+            textContentColor = SokoColors.textMuted,
+            shape = RoundedCornerShape(16.dp),
+            title = {
+                Text(
+                    text = if (isSw) "Weka Upya Nenosiri" else "Reset Password",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 18.sp
+                )
+            },
+            text = {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Text(
+                        text = if (isSw)
+                            "Weka anwani yako ya barua pepe. Tutakutumia kiungo cha kubadilisha nenosiri lako kupitia mfumo rasmi wa Firebase."
+                        else
+                            "Enter your email address. We will send you a password reset link via Firebase Authentication.",
+                        fontSize = 13.sp,
+                        color = SokoColors.textMuted
+                    )
+
+                    OutlinedTextField(
+                        value = resetEmail,
+                        onValueChange = {
+                            resetEmail = it
+                            resetErrorMessage = null
+                        },
+                        label = { Text(if (isSw) "Barua Pepe" else "Email Address") },
+                        leadingIcon = { Icon(Icons.Default.Email, contentDescription = null, tint = SokoNeonBlue) },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
+                        colors = authTextFieldColors(),
+                        modifier = Modifier.fillMaxWidth().testTag("reset_email_input")
+                    )
+
+                    if (resetStatusMessage != null) {
+                        Surface(
+                            color = SokoNeonBlue.copy(alpha = 0.15f),
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(
+                                text = resetStatusMessage!!,
+                                color = SokoNeonBlue,
+                                style = MaterialTheme.typography.bodySmall,
+                                modifier = Modifier.padding(10.dp),
+                                textAlign = TextAlign.Center
+                            )
+                        }
+                    }
+
+                    if (resetErrorMessage != null) {
+                        Surface(
+                            color = SokoError.copy(alpha = 0.15f),
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(
+                                text = resetErrorMessage!!,
+                                color = SokoError,
+                                style = MaterialTheme.typography.bodySmall,
+                                modifier = Modifier.padding(10.dp),
+                                textAlign = TextAlign.Center
+                            )
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        if (resetEmail.isBlank() || !resetEmail.contains("@")) {
+                            resetErrorMessage = if (isSw) "Tafadhali weka barua pepe sahihi" else "Please enter a valid email"
+                            return@Button
+                        }
+                        isResetLoading = true
+                        resetStatusMessage = null
+                        resetErrorMessage = null
+                        authManager.sendPasswordReset(
+                            email = resetEmail.trim(),
+                            scope = scope,
+                            onSuccess = {
+                                isResetLoading = false
+                                resetStatusMessage = if (isSw)
+                                    "Kiungo cha kuweka upya nenosiri kimetumwa! Tafadhali fungua barua pepe yako."
+                                else
+                                    "Password reset link sent! Please check your email inbox."
+                            },
+                            onError = { err ->
+                                isResetLoading = false
+                                resetErrorMessage = err
+                            }
+                        )
+                    },
+                    enabled = !isResetLoading,
+                    colors = ButtonDefaults.buttonColors(containerColor = SokoNeonBlue)
+                ) {
+                    if (isResetLoading) {
+                        CircularProgressIndicator(modifier = Modifier.size(16.dp), color = SokoBlueBlack, strokeWidth = 2.dp)
+                    } else {
+                        Text(if (isSw) "Tuma Kiungo" else "Send Reset Link", color = SokoBlueBlack, fontWeight = FontWeight.Bold)
+                    }
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = { showResetDialog = false },
+                    enabled = !isResetLoading
+                ) {
+                    Text(if (isSw) "Funga" else "Close", color = SokoColors.textMuted)
+                }
+            }
+        )
     }
 
     // TERMS AND CONDITIONS DIALOG
@@ -775,9 +960,9 @@ private fun TermsAndConditionsDialog(
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        containerColor = SokoMidnightBlue,
-        titleContentColor = SokoLightText,
-        textContentColor = SokoMutedText,
+        containerColor = SokoColors.surface,
+        titleContentColor = SokoColors.textPrimary,
+        textContentColor = SokoColors.textMuted,
         shape = RoundedCornerShape(16.dp),
         title = {
             Text(
@@ -799,7 +984,7 @@ private fun TermsAndConditionsDialog(
                     else
                         "Welcome to SokoTZ (Tanzania Premier Marketplace). By registering an account and using our services, you agree to the following terms:",
                     fontSize = 13.sp,
-                    color = SokoLightText
+                    color = SokoColors.textPrimary
                 )
 
                 TermsItem(
@@ -858,7 +1043,7 @@ private fun TermsAndConditionsDialog(
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text(if (isSw) "Funga" else "Close", color = SokoMutedText)
+                Text(if (isSw) "Funga" else "Close", color = SokoColors.textMuted)
             }
         }
     )
@@ -875,7 +1060,7 @@ private fun TermsItem(number: String, title: String, body: String) {
         )
         Text(
             text = body,
-            color = SokoMutedText,
+            color = SokoColors.textMuted,
             fontSize = 11.sp,
             lineHeight = 16.sp
         )
@@ -895,8 +1080,8 @@ private fun TrustBadge(
             modifier = Modifier
                 .size(36.dp)
                 .clip(CircleShape)
-                .background(SokoDeepNavy)
-                .border(1.dp, SokoCardBorder, CircleShape),
+                .background(SokoColors.inputBackground)
+                .border(1.dp, SokoColors.cardBorder, CircleShape),
             contentAlignment = Alignment.Center
         ) {
             Icon(
@@ -909,7 +1094,7 @@ private fun TrustBadge(
         Text(
             text = label,
             fontSize = 10.sp,
-            color = SokoMutedText,
+            color = SokoColors.textMuted,
             fontWeight = FontWeight.Medium
         )
     }
@@ -918,10 +1103,13 @@ private fun TrustBadge(
 @Composable
 private fun authTextFieldColors() = OutlinedTextFieldDefaults.colors(
     focusedBorderColor = SokoNeonBlue,
-    unfocusedBorderColor = SokoCardBorder,
+    unfocusedBorderColor = SokoColors.cardBorder,
     focusedLabelColor = SokoNeonBlue,
-    unfocusedLabelColor = SokoMutedText,
-    focusedTextColor = SokoLightText,
-    unfocusedTextColor = SokoLightText,
+    unfocusedLabelColor = SokoColors.textMuted,
+    focusedTextColor = SokoColors.textPrimary,
+    unfocusedTextColor = SokoColors.textPrimary,
+    focusedContainerColor = SokoColors.inputBackground,
+    unfocusedContainerColor = SokoColors.inputBackground,
     cursorColor = SokoNeonBlue
 )
+

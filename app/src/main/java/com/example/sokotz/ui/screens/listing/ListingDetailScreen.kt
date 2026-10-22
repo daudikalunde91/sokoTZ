@@ -51,6 +51,7 @@ import com.example.sokotz.data.model.AppLanguage
 import com.example.sokotz.data.repository.FirestoreMarketplaceRepository
 import com.example.sokotz.ui.components.ContactActionRow
 import com.example.sokotz.ui.components.SokoListingImage
+import com.example.ui.theme.SokoColors
 import com.example.ui.theme.SokoBlueBlack
 import com.example.ui.theme.SokoCardBorder
 import com.example.ui.theme.SokoCardSurface
@@ -90,12 +91,12 @@ fun ListingDetailScreen(
         Box(
             modifier = modifier
                 .fillMaxSize()
-                .background(SokoBlueBlack),
+                .background(SokoColors.background),
             contentAlignment = Alignment.Center
         ) {
             Text(
                 text = if (isSw) "Tangazo halikupatikana" else "Listing not found",
-                color = SokoLightText,
+                color = SokoColors.textPrimary,
                 style = MaterialTheme.typography.titleLarge
             )
         }
@@ -107,11 +108,11 @@ fun ListingDetailScreen(
     Column(
         modifier = modifier
             .fillMaxSize()
-            .background(SokoBlueBlack)
+            .background(SokoColors.background)
             .testTag("listing_detail_screen")
     ) {
         // App bar
-        Surface(color = SokoMidnightBlue) {
+        Surface(color = SokoColors.headerSurface) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -181,7 +182,7 @@ fun ListingDetailScreen(
                 Box(
                     modifier = Modifier
                         .clip(RoundedCornerShape(8.dp))
-                        .background(if (listing.isProduct) SokoMidnightBlue else SokoNeonViolet.copy(alpha = 0.2f))
+                        .background(if (listing.isProduct) (if (SokoColors.isDark) SokoMidnightBlue else androidx.compose.ui.graphics.Color(0xFFE0F2FE)) else SokoNeonViolet.copy(alpha = 0.2f))
                         .border(1.dp, if (listing.isProduct) SokoNeonBlue else SokoNeonViolet, RoundedCornerShape(8.dp))
                         .padding(horizontal = 10.dp, vertical = 4.dp)
                 ) {
@@ -193,9 +194,9 @@ fun ListingDetailScreen(
                 }
 
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Default.LocationOn, contentDescription = "Location", tint = SokoMutedText, modifier = Modifier.size(16.dp))
+                    Icon(Icons.Default.LocationOn, contentDescription = "Location", tint = SokoColors.textMuted, modifier = Modifier.size(16.dp))
                     Spacer(modifier = Modifier.width(4.dp))
-                    Text(listing.city, style = MaterialTheme.typography.bodySmall, color = SokoMutedText)
+                    Text(listing.city, style = MaterialTheme.typography.bodySmall, color = SokoColors.textMuted)
                 }
             }
 
@@ -205,7 +206,7 @@ fun ListingDetailScreen(
             Text(
                 text = listing.localizedTitle(language),
                 style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.ExtraBold),
-                color = SokoLightText
+                color = SokoColors.textPrimary
             )
 
             Spacer(modifier = Modifier.height(8.dp))
@@ -215,8 +216,8 @@ fun ListingDetailScreen(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier
                     .clip(RoundedCornerShape(8.dp))
-                    .background(SokoDeepNavy)
-                    .border(1.dp, SokoCardBorder, RoundedCornerShape(8.dp))
+                    .background(SokoColors.inputBackground)
+                    .border(1.dp, SokoColors.cardBorder, RoundedCornerShape(8.dp))
                     .padding(horizontal = 10.dp, vertical = 6.dp)
             ) {
                 Icon(
@@ -232,7 +233,7 @@ fun ListingDetailScreen(
                     else
                         "${listing.viewsCount} people have viewed this listing",
                     style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.SemiBold),
-                    color = SokoLightText
+                    color = SokoColors.textPrimary
                 )
             }
 
@@ -244,7 +245,7 @@ fun ListingDetailScreen(
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(12.dp))
                     .border(1.dp, SokoNeonBlue.copy(alpha = 0.4f), RoundedCornerShape(12.dp)),
-                colors = CardDefaults.cardColors(containerColor = SokoMidnightBlue)
+                colors = CardDefaults.cardColors(containerColor = SokoColors.cardSurface)
             ) {
                 Row(
                     modifier = Modifier
@@ -257,7 +258,7 @@ fun ListingDetailScreen(
                         Text(
                             text = if (isSw) "Bei Iliyotangazwa" else "Listed Price",
                             style = MaterialTheme.typography.labelSmall,
-                            color = SokoMutedText
+                            color = SokoColors.textMuted
                         )
                         Text(
                             text = "TZS $formattedPrice",
@@ -275,10 +276,10 @@ fun ListingDetailScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(12.dp))
-                    .border(1.dp, SokoCardBorder, RoundedCornerShape(12.dp))
+                    .border(1.dp, SokoColors.cardBorder, RoundedCornerShape(12.dp))
                     .clickable { onNavigateToBusiness(listing.businessId) }
                     .testTag("seller_business_link_card"),
-                colors = CardDefaults.cardColors(containerColor = SokoCardSurface)
+                colors = CardDefaults.cardColors(containerColor = SokoColors.cardSurface)
             ) {
                 Row(
                     modifier = Modifier
@@ -300,12 +301,12 @@ fun ListingDetailScreen(
                         Text(
                             text = if (isSw) "Muuzaji / Mtoa Huduma" else "Seller / Service Provider",
                             style = MaterialTheme.typography.bodySmall,
-                            color = SokoMutedText
+                            color = SokoColors.textMuted
                         )
                         Text(
                             text = listing.businessName,
                             style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                            color = SokoLightText
+                            color = SokoColors.textPrimary
                         )
                     }
                     Icon(Icons.Default.ChevronRight, contentDescription = "View", tint = SokoNeonBlue)
@@ -319,20 +320,20 @@ fun ListingDetailScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(12.dp))
-                    .border(1.dp, SokoCardBorder, RoundedCornerShape(12.dp)),
-                colors = CardDefaults.cardColors(containerColor = SokoCardSurface)
+                    .border(1.dp, SokoColors.cardBorder, RoundedCornerShape(12.dp)),
+                colors = CardDefaults.cardColors(containerColor = SokoColors.cardSurface)
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     Text(
                         text = if (isSw) "Maelezo Kamili" else "Full Description",
                         style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
-                        color = SokoLightText
+                        color = SokoColors.textPrimary
                     )
                     Spacer(modifier = Modifier.height(10.dp))
                     Text(
                         text = listing.localizedDesc(language),
                         style = MaterialTheme.typography.bodyLarge,
-                        color = SokoLightText,
+                        color = SokoColors.textPrimary,
                         lineHeight = 22.sp
                     )
                 }
@@ -343,10 +344,10 @@ fun ListingDetailScreen(
 
         // Fixed Bottom Contact Bar
         Surface(
-            color = SokoDeepNavy,
+            color = SokoColors.headerSurface,
             modifier = Modifier
                 .fillMaxWidth()
-                .border(1.dp, SokoCardBorder, RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp))
+                .border(1.dp, SokoColors.cardBorder, RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp))
         ) {
             Box(modifier = Modifier.padding(16.dp)) {
                 ContactActionRow(

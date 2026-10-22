@@ -46,6 +46,7 @@ import com.example.sokotz.data.model.AppLanguage
 import com.example.sokotz.data.repository.FirestoreMarketplaceRepository
 import com.example.sokotz.ui.components.ContactActionRow
 import com.example.sokotz.ui.components.ListingCard
+import com.example.ui.theme.SokoColors
 import com.example.ui.theme.SokoBlueBlack
 import com.example.ui.theme.SokoCardBorder
 import com.example.ui.theme.SokoCardSurface
@@ -77,12 +78,12 @@ fun BusinessDetailScreen(
         Box(
             modifier = modifier
                 .fillMaxSize()
-                .background(SokoBlueBlack),
+                .background(SokoColors.background),
             contentAlignment = Alignment.Center
         ) {
             Text(
                 text = if (isSw) "Biashara haikupatikana" else "Business not found",
-                color = SokoLightText,
+                color = SokoColors.textPrimary,
                 style = MaterialTheme.typography.titleLarge
             )
         }
@@ -92,13 +93,13 @@ fun BusinessDetailScreen(
     LazyColumn(
         modifier = modifier
             .fillMaxSize()
-            .background(SokoBlueBlack)
+            .background(SokoColors.background)
             .testTag("business_detail_screen"),
         contentPadding = PaddingValues(bottom = 32.dp)
     ) {
         // App bar
         item {
-            Surface(color = SokoMidnightBlue) {
+            Surface(color = SokoColors.headerSurface) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -109,13 +110,13 @@ fun BusinessDetailScreen(
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = "Back",
-                            tint = SokoLightText
+                            tint = SokoColors.textPrimary
                         )
                     }
                     Text(
                         text = if (isSw) "Taarifa za Biashara" else "Business Profile",
                         style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
-                        color = SokoLightText
+                        color = SokoColors.textPrimary
                     )
                 }
             }
@@ -126,7 +127,7 @@ fun BusinessDetailScreen(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(SokoGradients.HeroGradient)
+                    .background(SokoColors.heroGradient)
                     .padding(16.dp)
             ) {
                 Column {
@@ -181,7 +182,7 @@ fun BusinessDetailScreen(
                     Text(
                         text = business.name,
                         style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.ExtraBold),
-                        color = SokoLightText
+                        color = SokoColors.textPrimary
                     )
 
                     Spacer(modifier = Modifier.height(4.dp))
@@ -199,15 +200,15 @@ fun BusinessDetailScreen(
                         horizontalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Default.LocationOn, contentDescription = "Location", tint = SokoMutedText, modifier = Modifier.size(16.dp))
+                            Icon(Icons.Default.LocationOn, contentDescription = "Location", tint = SokoColors.textMuted, modifier = Modifier.size(16.dp))
                             Spacer(modifier = Modifier.width(4.dp))
-                            Text("${business.city}, ${business.district}", style = MaterialTheme.typography.bodySmall, color = SokoMutedText)
+                            Text("${business.city}, ${business.district}", style = MaterialTheme.typography.bodySmall, color = SokoColors.textMuted)
                         }
 
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Icon(Icons.Default.Star, contentDescription = "Rating", tint = Color(0xFFFFD700), modifier = Modifier.size(16.dp))
                             Spacer(modifier = Modifier.width(4.dp))
-                            Text("${business.rating} (${business.reviewCount} ${if (isSw) "maoni" else "reviews"})", style = MaterialTheme.typography.bodySmall, color = SokoLightText)
+                            Text("${business.rating} (${business.reviewCount} ${if (isSw) "maoni" else "reviews"})", style = MaterialTheme.typography.bodySmall, color = SokoColors.textPrimary)
                         }
                     }
 
@@ -230,20 +231,20 @@ fun BusinessDetailScreen(
                     .fillMaxWidth()
                     .padding(16.dp)
                     .clip(RoundedCornerShape(14.dp))
-                    .border(1.dp, SokoCardBorder, RoundedCornerShape(14.dp)),
-                colors = CardDefaults.cardColors(containerColor = SokoCardSurface)
+                    .border(1.dp, SokoColors.cardBorder, RoundedCornerShape(14.dp)),
+                colors = CardDefaults.cardColors(containerColor = SokoColors.cardSurface)
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     Text(
                         text = if (isSw) "Kuhusu Biashara Hii" else "About This Business",
                         style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
-                        color = SokoLightText
+                        color = SokoColors.textPrimary
                     )
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
                         text = business.localizedDesc(language),
                         style = MaterialTheme.typography.bodyLarge,
-                        color = SokoLightText
+                        color = SokoColors.textPrimary
                     )
 
                     Spacer(modifier = Modifier.height(16.dp))
@@ -255,9 +256,9 @@ fun BusinessDetailScreen(
                             Text(
                                 text = if (isSw) "Masaa ya Kazi" else "Operating Hours",
                                 style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold),
-                                color = SokoLightText
+                                color = SokoColors.textPrimary
                             )
-                            Text(business.openingHours, style = MaterialTheme.typography.bodyMedium, color = SokoMutedText)
+                            Text(business.openingHours, style = MaterialTheme.typography.bodyMedium, color = SokoColors.textMuted)
                         }
                     }
 
@@ -270,9 +271,9 @@ fun BusinessDetailScreen(
                                 Text(
                                     text = if (isSw) "Anwani Halisi" else "Physical Address",
                                     style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold),
-                                    color = SokoLightText
+                                    color = SokoColors.textPrimary
                                 )
-                                Text(business.address, style = MaterialTheme.typography.bodyMedium, color = SokoMutedText)
+                                Text(business.address, style = MaterialTheme.typography.bodyMedium, color = SokoColors.textMuted)
                             }
                         }
                     }
@@ -286,7 +287,7 @@ fun BusinessDetailScreen(
                 Text(
                     text = if (isSw) "Matangazo ya Biashara Hii (${listings.size})" else "Listings by this Business (${listings.size})",
                     style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
-                    color = SokoLightText
+                    color = SokoColors.textPrimary
                 )
                 Spacer(modifier = Modifier.height(10.dp))
             }
@@ -296,7 +297,7 @@ fun BusinessDetailScreen(
             item {
                 Text(
                     text = if (isSw) "Bado hakuna bidhaa zilizopakiwa na biashara hii." else "No listings uploaded yet by this business.",
-                    color = SokoMutedText,
+                    color = SokoColors.textMuted,
                     modifier = Modifier.padding(16.dp)
                 )
             }

@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -38,6 +39,7 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -66,6 +68,7 @@ import com.example.sokotz.data.model.AppLanguage
 import com.example.sokotz.data.model.AssistantMessage
 import com.example.sokotz.data.repository.FirestoreMarketplaceRepository
 import com.example.sokotz.ui.components.ListingCard
+import com.example.ui.theme.SokoColors
 import com.example.ui.theme.SokoBlueBlack
 import com.example.ui.theme.SokoCardBorder
 import com.example.ui.theme.SokoCardSurface
@@ -121,11 +124,12 @@ fun AssistantScreen(
     Column(
         modifier = modifier
             .fillMaxSize()
-            .background(SokoBlueBlack)
+            .background(SokoColors.background)
+            .imePadding()
             .testTag("assistant_screen")
     ) {
         // Assistant Header
-        Surface(color = SokoMidnightBlue) {
+        Surface(color = SokoColors.headerSurface) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -153,7 +157,7 @@ fun AssistantScreen(
                         Text(
                             text = if (isSw) "sokoTZ Msaidizi" else "sokoTZ AI",
                             style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                            color = SokoLightText
+                            color = SokoColors.textPrimary
                         )
                         Text(
                             text = if (isSw) "Msaidizi Mahiri • Mazungumzo ya Moja kwa Moja" else "Intelligent Assistant • Multi-turn Live Chat",
@@ -181,8 +185,8 @@ fun AssistantScreen(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(SokoDeepNavy)
-                .border(1.dp, SokoCardBorder)
+                .background(SokoColors.cardSurface)
+                .border(1.dp, SokoColors.cardBorder)
                 .padding(horizontal = 16.dp, vertical = 8.dp)
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -199,7 +203,7 @@ fun AssistantScreen(
                     else
                         "Powered by sokoTZ AI and grounded in live SokoTZ marketplace data. Always verify transaction terms directly with sellers.",
                     style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
-                    color = SokoMutedText
+                    color = SokoColors.textMuted
                 )
             }
         }
@@ -237,15 +241,16 @@ fun AssistantScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         CircularProgressIndicator(
-                            modifier = Modifier.size(18.dp),
+                            modifier = Modifier.size(16.dp),
                             color = SokoNeonViolet,
                             strokeWidth = 2.dp
                         )
-                        Spacer(modifier = Modifier.width(10.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
                         Text(
-                            text = if (isSw) "sokoTZ Msaidizi anafikiri na kuandaa jibu..." else "sokoTZ AI is thinking...",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = SokoNeonViolet
+                            text = if (isSw) "sokoTZ Msaidizi (inafikiria...)" else "sokoTZ AI (thinking...)",
+                            style = MaterialTheme.typography.bodyMedium.copy(fontStyle = androidx.compose.ui.text.font.FontStyle.Italic),
+                            color = SokoNeonViolet,
+                            fontWeight = FontWeight.SemiBold
                         )
                     }
                 }
@@ -267,14 +272,10 @@ fun AssistantScreen(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .clip(RoundedCornerShape(10.dp))
-                                    .background(SokoCardSurface)
-                                    .border(1.dp, SokoCardBorder, RoundedCornerShape(10.dp))
+                                    .background(SokoColors.cardSurface)
+                                    .border(1.dp, SokoColors.cardBorder, RoundedCornerShape(10.dp))
                                     .clickable {
-                                        if (currentUser == null) {
-                                            onNavigateToSignIn()
-                                        } else {
-                                            repository.sendAssistantMessage(question, scope)
-                                        }
+                                        repository.sendAssistantMessage(question, scope)
                                     }
                                     .padding(horizontal = 12.dp, vertical = 10.dp)
                                     .testTag("suggested_prompt_chip")
@@ -287,7 +288,7 @@ fun AssistantScreen(
                                     Text(
                                         text = question,
                                         style = MaterialTheme.typography.bodyMedium,
-                                        color = SokoLightText
+                                        color = SokoColors.textPrimary
                                     )
                                     Icon(
                                         imageVector = Icons.Default.AutoAwesome,
@@ -303,62 +304,37 @@ fun AssistantScreen(
             }
         }
 
-        if (currentUser == null) {
-            Surface(
-                color = SokoMidnightBlue,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp))
-                    .border(1.dp, SokoNeonViolet.copy(alpha = 0.5f), RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp))
-            ) {
-                Column(
-                    modifier = Modifier.padding(16.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Text(
-                        text = if (isSw) "Ingia Kuanza Kuongea na sokoTZ AI" else "Sign In to Chat with sokoTZ AI",
-                        fontWeight = FontWeight.Bold,
-                        color = SokoLightText,
-                        fontSize = 14.sp
-                    )
-                    Text(
-                        text = if (isSw)
-                            "sokoTZ AI inahitaji akaunti ili iweze kukukaribisha kwa jina lako na kukupa ushauri wa bidhaa na biashara uliolengwa kwako."
-                        else
-                            "Sign in to personalize your conversation with sokoTZ AI and receive tailored marketplace recommendations.",
-                        color = SokoMutedText,
-                        fontSize = 12.sp,
-                        textAlign = androidx.compose.ui.text.style.TextAlign.Center
-                    )
-                    Button(
-                        onClick = onNavigateToSignIn,
-                        colors = ButtonDefaults.buttonColors(containerColor = SokoNeonBlue),
-                        shape = RoundedCornerShape(8.dp),
+        // Input bar
+        Surface(
+            color = SokoColors.navBarSurface,
+            modifier = Modifier
+                .fillMaxWidth()
+                .border(1.dp, SokoColors.cardBorder, RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp))
+        ) {
+            Column {
+                if (currentUser == null) {
+                    Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(42.dp)
-                            .testTag("assistant_guest_signin_button")
+                            .background(SokoColors.surface)
+                            .padding(horizontal = 14.dp, vertical = 6.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Icon(Icons.Default.Login, contentDescription = null, tint = SokoBlueBlack, modifier = Modifier.size(16.dp))
-                        Spacer(modifier = Modifier.width(8.dp))
                         Text(
-                            text = if (isSw) "Ingia / Fungua Akaunti Bure" else "Sign In / Register Free",
-                            color = SokoBlueBlack,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 13.sp
+                            text = if (isSw) "Unatumia kama mteja mgeni." else "Browsing as guest customer.",
+                            style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
+                            color = SokoColors.textMuted
+                        )
+                        Text(
+                            text = if (isSw) "Ingia hapa" else "Sign In",
+                            style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp, fontWeight = FontWeight.Bold),
+                            color = SokoNeonBlue,
+                            modifier = Modifier.clickable { onNavigateToSignIn() }
                         )
                     }
+                    HorizontalDivider(color = SokoColors.cardBorder, thickness = 1.dp)
                 }
-            }
-        } else {
-            // Input bar
-            Surface(
-                color = SokoMidnightBlue,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .border(1.dp, SokoCardBorder, RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp))
-            ) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -371,20 +347,20 @@ fun AssistantScreen(
                         placeholder = {
                             Text(
                                 text = if (isSw) "Uliza kwa Kiswahili au Kiingereza..." else "Ask in Kiswahili or English...",
-                                color = SokoMutedText,
+                                color = SokoColors.textMuted,
                                 style = MaterialTheme.typography.bodyMedium
                             )
                         },
                         modifier = Modifier
                             .weight(1f)
                             .clip(RoundedCornerShape(12.dp))
-                            .background(SokoDeepNavy)
+                            .background(SokoColors.inputBackground)
                             .testTag("assistant_text_input"),
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedBorderColor = SokoNeonBlue,
-                            unfocusedBorderColor = SokoCardBorder,
-                            focusedTextColor = SokoLightText,
-                            unfocusedTextColor = SokoLightText
+                            unfocusedBorderColor = SokoColors.cardBorder,
+                            focusedTextColor = SokoColors.textPrimary,
+                            unfocusedTextColor = SokoColors.textPrimary
                         ),
                         maxLines = 3,
                         enabled = !isThinking
@@ -402,13 +378,13 @@ fun AssistantScreen(
                         modifier = Modifier
                             .size(48.dp)
                             .clip(CircleShape)
-                            .background(if (inputText.isNotBlank() && !isThinking) SokoNeonBlue else SokoCardBorder)
+                            .background(if (inputText.isNotBlank() && !isThinking) SokoNeonBlue else SokoColors.cardBorder)
                             .testTag("assistant_send_button")
                     ) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.Send,
                             contentDescription = "Send",
-                            tint = if (inputText.isNotBlank() && !isThinking) SokoBlueBlack else SokoMutedText
+                            tint = if (inputText.isNotBlank() && !isThinking) SokoBlueBlack else SokoColors.textMuted
                         )
                     }
                 }
@@ -451,7 +427,7 @@ fun MessageBubble(
                 )
                 .border(
                     1.dp,
-                    if (isUser) SokoNeonBlue.copy(alpha = 0.5f) else SokoCardBorder,
+                    if (isUser) SokoNeonBlue.copy(alpha = 0.5f) else SokoColors.cardBorder,
                     RoundedCornerShape(
                         topStart = 16.dp,
                         topEnd = 16.dp,
@@ -460,14 +436,14 @@ fun MessageBubble(
                     )
                 ),
             colors = CardDefaults.cardColors(
-                containerColor = if (isUser) SokoDeepPurple.copy(alpha = 0.6f) else SokoCardSurface
+                containerColor = if (isUser) (if (SokoColors.isDark) SokoDeepPurple.copy(alpha = 0.6f) else androidx.compose.ui.graphics.Color(0xFFEDE9FE)) else SokoColors.cardSurface
             )
         ) {
             Column(modifier = Modifier.padding(14.dp)) {
                 Text(
                     text = message.text,
                     style = MaterialTheme.typography.bodyLarge,
-                    color = SokoLightText,
+                    color = SokoColors.textPrimary,
                     lineHeight = 22.sp
                 )
 
@@ -478,7 +454,7 @@ fun MessageBubble(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clip(RoundedCornerShape(8.dp))
-                            .background(SokoMidnightBlue)
+                            .background(if (SokoColors.isDark) SokoMidnightBlue else androidx.compose.ui.graphics.Color(0xFFF1F5F9))
                             .clickable { onCopyText(message.text) }
                             .padding(horizontal = 10.dp, vertical = 6.dp),
                         horizontalArrangement = Arrangement.Center,

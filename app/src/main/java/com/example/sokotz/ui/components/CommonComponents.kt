@@ -168,10 +168,10 @@ fun ListingCard(
         modifier = modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(14.dp))
-            .border(1.dp, SokoCardBorder, RoundedCornerShape(14.dp))
+            .border(1.dp, SokoColors.cardBorder, RoundedCornerShape(14.dp))
             .clickable { onClick() }
             .testTag("listing_card_${listing.id}"),
-        colors = CardDefaults.cardColors(containerColor = SokoCardSurface)
+        colors = CardDefaults.cardColors(containerColor = SokoColors.cardSurface)
     ) {
         Column(modifier = Modifier.padding(14.dp)) {
             Row(
@@ -183,7 +183,7 @@ fun ListingCard(
                 Box(
                     modifier = Modifier
                         .clip(RoundedCornerShape(6.dp))
-                        .background(if (listing.isProduct) SokoMidnightBlue else SokoNeonViolet.copy(alpha = 0.2f))
+                        .background(if (listing.isProduct) (if (SokoColors.isDark) SokoMidnightBlue else androidx.compose.ui.graphics.Color(0xFFE0F2FE)) else SokoNeonViolet.copy(alpha = 0.2f))
                         .border(1.dp, if (listing.isProduct) SokoNeonBlue.copy(alpha = 0.5f) else SokoNeonViolet.copy(alpha = 0.6f), RoundedCornerShape(6.dp))
                         .padding(horizontal = 8.dp, vertical = 3.dp)
                 ) {
@@ -212,14 +212,14 @@ fun ListingCard(
                     Icon(
                         imageVector = Icons.Default.LocationOn,
                         contentDescription = "Location",
-                        tint = SokoMutedText,
+                        tint = SokoColors.textMuted,
                         modifier = Modifier.size(14.dp)
                     )
                     Spacer(modifier = Modifier.width(2.dp))
                     Text(
                         text = listing.city,
                         style = MaterialTheme.typography.bodySmall,
-                        color = SokoMutedText
+                        color = SokoColors.textMuted
                     )
                 }
             }
@@ -243,7 +243,7 @@ fun ListingCard(
             Text(
                 text = listing.localizedTitle(language),
                 style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
-                color = SokoLightText,
+                color = SokoColors.textPrimary,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis
             )
@@ -254,7 +254,7 @@ fun ListingCard(
             Text(
                 text = listing.businessName,
                 style = MaterialTheme.typography.bodyMedium,
-                color = SokoMutedText
+                color = SokoColors.textMuted
             )
 
             Spacer(modifier = Modifier.height(10.dp))
@@ -325,10 +325,10 @@ fun BusinessCard(
         modifier = modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(14.dp))
-            .border(1.dp, SokoCardBorder, RoundedCornerShape(14.dp))
+            .border(1.dp, SokoColors.cardBorder, RoundedCornerShape(14.dp))
             .clickable { onClick() }
             .testTag("business_card_${business.id}"),
-        colors = CardDefaults.cardColors(containerColor = SokoCardSurface)
+        colors = CardDefaults.cardColors(containerColor = SokoColors.cardSurface)
     ) {
         Column(modifier = Modifier.padding(14.dp)) {
             Row(
@@ -340,7 +340,7 @@ fun BusinessCard(
                     Text(
                         text = business.name,
                         style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
-                        color = SokoLightText,
+                        color = SokoColors.textPrimary,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
@@ -366,7 +366,7 @@ fun BusinessCard(
                     Text(
                         text = "${business.rating} (${business.reviewCount})",
                         style = MaterialTheme.typography.bodySmall,
-                        color = SokoLightText
+                        color = SokoColors.textPrimary
                     )
                 }
             }
@@ -384,7 +384,7 @@ fun BusinessCard(
             Text(
                 text = business.localizedDesc(language),
                 style = MaterialTheme.typography.bodyMedium,
-                color = SokoMutedText,
+                color = SokoColors.textMuted,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis
             )

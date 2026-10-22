@@ -84,6 +84,7 @@ import com.example.sokotz.data.model.UserProfile
 import com.example.sokotz.data.repository.FirestoreMarketplaceRepository
 import com.example.sokotz.data.util.ImageUtils
 import com.example.sokotz.ui.components.SokoListingImage
+import com.example.ui.theme.SokoColors
 import com.example.ui.theme.SokoBlueBlack
 import com.example.ui.theme.SokoCardBorder
 import com.example.ui.theme.SokoCardSurface
@@ -121,13 +122,13 @@ fun AccountScreen(
     Column(
         modifier = modifier
             .fillMaxSize()
-            .background(SokoBlueBlack)
+            .background(SokoColors.background)
             .verticalScroll(rememberScrollState())
             .testTag("account_screen"),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         // Top App Bar
-        Surface(color = SokoMidnightBlue) {
+        Surface(color = SokoColors.headerSurface) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -153,8 +154,8 @@ fun AccountScreen(
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp)
                     .clip(RoundedCornerShape(16.dp))
-                    .border(1.dp, SokoCardBorder, RoundedCornerShape(16.dp)),
-                colors = CardDefaults.cardColors(containerColor = SokoCardSurface)
+                    .border(1.dp, SokoColors.cardBorder, RoundedCornerShape(16.dp)),
+                colors = CardDefaults.cardColors(containerColor = SokoColors.cardSurface)
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     Row(
@@ -196,12 +197,12 @@ fun AccountScreen(
                             Text(
                                 text = profile?.displayName?.ifBlank { null } ?: user.displayName ?: (if (isSw) "Mwanachama SokoTZ" else "SokoTZ Member"),
                                 style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
-                                color = SokoLightText
+                                color = SokoColors.textPrimary
                             )
                             Text(
                                 text = profile?.email?.ifBlank { null } ?: user.email ?: profile?.phoneNumber ?: user.phoneNumber ?: "",
                                 style = MaterialTheme.typography.bodyMedium,
-                                color = SokoMutedText
+                                color = SokoColors.textMuted
                             )
 
                             // AI Preferred Name indicator
@@ -221,7 +222,7 @@ fun AccountScreen(
                                 Box(
                                     modifier = Modifier
                                         .clip(RoundedCornerShape(6.dp))
-                                        .background(SokoDeepNavy)
+                                        .background(SokoColors.inputBackground)
                                         .border(1.dp, SokoNeonBlue.copy(alpha = 0.5f), RoundedCornerShape(6.dp))
                                         .padding(horizontal = 8.dp, vertical = 2.dp)
                                 ) {
@@ -248,7 +249,7 @@ fun AccountScreen(
                             .testTag("edit_profile_button"),
                         shape = RoundedCornerShape(8.dp),
                         border = androidx.compose.foundation.BorderStroke(1.dp, SokoNeonBlue.copy(alpha = 0.7f)),
-                        colors = ButtonDefaults.outlinedButtonColors(containerColor = SokoMidnightBlue)
+                        colors = ButtonDefaults.outlinedButtonColors(containerColor = if (SokoColors.isDark) SokoMidnightBlue else androidx.compose.ui.graphics.Color(0xFFE0F2FE))
                     ) {
                         Icon(Icons.Default.Edit, contentDescription = "Edit Profile", tint = SokoNeonBlue, modifier = Modifier.size(16.dp))
                         Spacer(modifier = Modifier.width(6.dp))
@@ -313,7 +314,7 @@ fun AccountScreen(
                     .padding(horizontal = 16.dp)
                     .clip(RoundedCornerShape(16.dp))
                     .border(1.dp, SokoNeonBlue.copy(alpha = 0.5f), RoundedCornerShape(16.dp)),
-                colors = CardDefaults.cardColors(containerColor = SokoCardSurface)
+                colors = CardDefaults.cardColors(containerColor = SokoColors.cardSurface)
             ) {
                 Column(
                     modifier = Modifier.padding(20.dp),
@@ -333,7 +334,7 @@ fun AccountScreen(
                     Text(
                         text = if (isSw) "Mgeni / Guest User" else "Guest User",
                         style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
-                        color = SokoLightText
+                        color = SokoColors.textPrimary
                     )
 
                     Text(
@@ -342,7 +343,7 @@ fun AccountScreen(
                         else
                             "You can browse and search items countrywide as a guest. To post ads or chat with sokoTZ AI, please sign in or register.",
                         style = MaterialTheme.typography.bodySmall,
-                        color = SokoMutedText,
+                        color = SokoColors.textMuted,
                         modifier = Modifier.padding(horizontal = 8.dp)
                     )
 
@@ -378,8 +379,8 @@ fun AccountScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(14.dp))
-                    .border(1.dp, SokoCardBorder, RoundedCornerShape(14.dp)),
-                colors = CardDefaults.cardColors(containerColor = SokoCardSurface)
+                    .border(1.dp, SokoColors.cardBorder, RoundedCornerShape(14.dp)),
+                colors = CardDefaults.cardColors(containerColor = SokoColors.cardSurface)
             ) {
                 Column(modifier = Modifier.padding(14.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -393,7 +394,7 @@ fun AccountScreen(
                         Text(
                             text = if (isSw) "Muonekano (Mode ya Mandhari)" else "Appearance (Theme Mode)",
                             style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
-                            color = SokoLightText
+                            color = SokoColors.textPrimary
                         )
                     }
 
@@ -420,10 +421,10 @@ fun AccountScreen(
                                 shape = RoundedCornerShape(8.dp),
                                 border = androidx.compose.foundation.BorderStroke(
                                     1.dp,
-                                    if (isSelected) SokoNeonBlue else SokoCardBorder
+                                    if (isSelected) SokoNeonBlue else SokoColors.cardBorder
                                 ),
                                 colors = ButtonDefaults.outlinedButtonColors(
-                                    containerColor = if (isSelected) SokoMidnightBlue else Color.Transparent
+                                    containerColor = if (isSelected) (if (SokoColors.isDark) SokoMidnightBlue else androidx.compose.ui.graphics.Color(0xFFE0F2FE)) else Color.Transparent
                                 ),
                                 contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 4.dp, vertical = 6.dp)
                             ) {
@@ -431,7 +432,7 @@ fun AccountScreen(
                                     Icon(
                                         imageVector = icon,
                                         contentDescription = null,
-                                        tint = if (isSelected) SokoNeonBlue else SokoMutedText,
+                                        tint = if (isSelected) SokoNeonBlue else SokoColors.textMuted,
                                         modifier = Modifier.size(14.dp)
                                     )
                                     Spacer(modifier = Modifier.width(4.dp))
@@ -439,7 +440,7 @@ fun AccountScreen(
                                         text = label,
                                         fontSize = 11.sp,
                                         fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                                        color = if (isSelected) SokoNeonBlue else SokoMutedText
+                                        color = if (isSelected) SokoNeonBlue else SokoColors.textMuted
                                     )
                                 }
                             }
@@ -762,10 +763,10 @@ fun EditProfileDialog(
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text(if (isSw) "Ghairi" else "Cancel", color = SokoMutedText)
+                Text(if (isSw) "Ghairi" else "Cancel", color = SokoColors.textMuted)
             }
         },
-        containerColor = SokoCardSurface
+        containerColor = SokoColors.cardSurface
     )
 }
 
@@ -781,9 +782,9 @@ fun AccountSettingItem(
         modifier = modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(12.dp))
-            .border(1.dp, SokoCardBorder, RoundedCornerShape(12.dp))
+            .border(1.dp, SokoColors.cardBorder, RoundedCornerShape(12.dp))
             .clickable { onClick() },
-        colors = CardDefaults.cardColors(containerColor = SokoCardSurface)
+        colors = CardDefaults.cardColors(containerColor = SokoColors.cardSurface)
     ) {
         Row(
             modifier = Modifier
@@ -797,18 +798,18 @@ fun AccountSettingItem(
                     modifier = Modifier
                         .size(38.dp)
                         .clip(RoundedCornerShape(8.dp))
-                        .background(SokoMidnightBlue),
+                        .background(if (SokoColors.isDark) SokoMidnightBlue else MaterialTheme.colorScheme.primaryContainer),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(icon, contentDescription = null, tint = SokoNeonBlue, modifier = Modifier.size(20.dp))
                 }
                 Spacer(modifier = Modifier.width(14.dp))
                 Column {
-                    Text(text = title, style = MaterialTheme.typography.titleMedium, color = SokoLightText, fontWeight = FontWeight.SemiBold)
-                    Text(text = subtitle, style = MaterialTheme.typography.bodySmall, color = SokoMutedText)
+                    Text(text = title, style = MaterialTheme.typography.titleMedium, color = SokoColors.textPrimary, fontWeight = FontWeight.SemiBold)
+                    Text(text = subtitle, style = MaterialTheme.typography.bodySmall, color = SokoColors.textMuted)
                 }
             }
-            Icon(Icons.Default.ChevronRight, contentDescription = "Navigate", tint = SokoMutedText)
+            Icon(Icons.Default.ChevronRight, contentDescription = "Navigate", tint = SokoColors.textMuted)
         }
     }
 }

@@ -91,6 +91,7 @@ import com.example.sokotz.data.repository.FirestoreMarketplaceRepository
 import com.example.sokotz.data.util.ImageUtils
 import com.example.sokotz.ui.components.ListingCard
 import com.example.sokotz.ui.components.SokoListingImage
+import com.example.ui.theme.SokoColors
 import com.example.ui.theme.SokoBlueBlack
 import com.example.ui.theme.SokoCardBorder
 import com.example.ui.theme.SokoCardSurface
@@ -128,7 +129,7 @@ fun BusinessHubScreen(
         Column(
             modifier = modifier
                 .fillMaxSize()
-                .background(SokoBlueBlack)
+                .background(SokoColors.background)
                 .padding(20.dp)
                 .verticalScroll(rememberScrollState()),
             horizontalAlignment = Alignment.CenterHorizontally,
@@ -147,7 +148,7 @@ fun BusinessHubScreen(
             Text(
                 text = if (isSw) "Kituo cha Wafanyabiashara SokoTZ" else "SokoTZ Business Seller Hub",
                 style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
-                color = SokoLightText,
+                color = SokoColors.textPrimary,
                 textAlign = androidx.compose.ui.text.style.TextAlign.Center
             )
             Text(
@@ -156,15 +157,15 @@ fun BusinessHubScreen(
                 else
                     "Selling on SokoTZ requires a seller account to register your store profile, specify working hours, publish listings, and connect with customers.",
                 style = MaterialTheme.typography.bodyMedium,
-                color = SokoMutedText,
+                color = SokoColors.textMuted,
                 textAlign = androidx.compose.ui.text.style.TextAlign.Center
             )
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(12.dp))
-                    .border(1.dp, SokoCardBorder, RoundedCornerShape(12.dp)),
-                colors = CardDefaults.cardColors(containerColor = SokoMidnightBlue)
+                    .border(1.dp, SokoColors.cardBorder, RoundedCornerShape(12.dp)),
+                colors = CardDefaults.cardColors(containerColor = SokoColors.cardSurface)
             ) {
                 Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Text(
@@ -177,7 +178,7 @@ fun BusinessHubScreen(
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
                             text = if (isSw) "Sajili wasifu wa duka lako na muda maalum wa kazi" else "Register store profile with working hours",
-                            color = SokoLightText,
+                            color = SokoColors.textPrimary,
                             fontSize = 12.sp
                         )
                     }
@@ -186,7 +187,7 @@ fun BusinessHubScreen(
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
                             text = if (isSw) "Weka picha kutoka kwenye kamera au galari ya simu" else "Upload photos using camera or gallery",
-                            color = SokoLightText,
+                            color = SokoColors.textPrimary,
                             fontSize = 12.sp
                         )
                     }
@@ -195,7 +196,7 @@ fun BusinessHubScreen(
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
                             text = if (isSw) "Tazama idadi halisi ya watazamaji (Unique Viewers)" else "Track unique viewers per user account",
-                            color = SokoLightText,
+                            color = SokoColors.textPrimary,
                             fontSize = 12.sp
                         )
                     }
@@ -204,7 +205,7 @@ fun BusinessHubScreen(
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
                             text = if (isSw) "Usaidizi wa sokoTZ AI kutunga maelezo ya kuvutia" else "Draft ad copy with sokoTZ AI assistance",
-                            color = SokoLightText,
+                            color = SokoColors.textPrimary,
                             fontSize = 12.sp
                         )
                     }
@@ -243,11 +244,11 @@ fun BusinessHubScreen(
     Column(
         modifier = modifier
             .fillMaxSize()
-            .background(SokoBlueBlack)
+            .background(SokoColors.background)
             .testTag("business_hub_screen")
     ) {
         // Hub Top Bar
-        Surface(color = SokoMidnightBlue) {
+        Surface(color = SokoColors.headerSurface) {
             Column(modifier = Modifier.padding(16.dp)) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -285,7 +286,7 @@ fun BusinessHubScreen(
                 // Tab Selector
                 TabRow(
                     selectedTabIndex = currentTab,
-                    containerColor = SokoDeepNavy,
+                    containerColor = SokoColors.inputBackground,
                     contentColor = SokoNeonBlue,
                     indicator = { tabPositions ->
                         TabRowDefaults.SecondaryIndicator(
@@ -431,7 +432,7 @@ fun BusinessHubScreen(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .padding(vertical = 12.dp),
-                                colors = CardDefaults.cardColors(containerColor = SokoCardSurface)
+                                colors = CardDefaults.cardColors(containerColor = SokoColors.cardSurface)
                             ) {
                                 Column(
                                     modifier = Modifier.padding(24.dp),
@@ -439,7 +440,7 @@ fun BusinessHubScreen(
                                 ) {
                                     Text(
                                         text = if (isSw) "Bado hujachapisha tangazo lolote." else "You haven't published any listings yet.",
-                                        color = SokoMutedText,
+                                        color = SokoColors.textMuted,
                                         style = MaterialTheme.typography.bodyMedium
                                     )
                                     Spacer(modifier = Modifier.height(12.dp))
@@ -458,8 +459,8 @@ fun BusinessHubScreen(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .clip(RoundedCornerShape(14.dp))
-                                    .background(SokoCardSurface)
-                                    .border(1.dp, SokoCardBorder, RoundedCornerShape(14.dp))
+                                    .background(SokoColors.cardSurface)
+                                    .border(1.dp, SokoColors.cardBorder, RoundedCornerShape(14.dp))
                                     .padding(12.dp)
                             ) {
                                 ListingCard(
@@ -475,7 +476,7 @@ fun BusinessHubScreen(
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .clip(RoundedCornerShape(8.dp))
-                                        .background(SokoDeepNavy)
+                                        .background(SokoColors.inputBackground)
                                         .padding(horizontal = 10.dp, vertical = 6.dp),
                                     horizontalArrangement = Arrangement.SpaceBetween,
                                     verticalAlignment = Alignment.CenterVertically
@@ -500,7 +501,7 @@ fun BusinessHubScreen(
                                             onClick = { editingListing = listing },
                                             shape = RoundedCornerShape(6.dp),
                                             border = androidx.compose.foundation.BorderStroke(1.dp, SokoNeonBlue),
-                                            colors = ButtonDefaults.outlinedButtonColors(containerColor = SokoMidnightBlue),
+                                            colors = ButtonDefaults.outlinedButtonColors(containerColor = if (SokoColors.isDark) SokoMidnightBlue else androidx.compose.ui.graphics.Color(0xFFE0F2FE)),
                                             contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
                                             modifier = Modifier.height(32.dp).testTag("edit_listing_button_${listing.id}")
                                         ) {
@@ -513,7 +514,7 @@ fun BusinessHubScreen(
                                             onClick = { listingToDelete = listing },
                                             shape = RoundedCornerShape(6.dp),
                                             border = androidx.compose.foundation.BorderStroke(1.dp, SokoError.copy(alpha = 0.6f)),
-                                            colors = ButtonDefaults.outlinedButtonColors(containerColor = SokoMidnightBlue),
+                                            colors = ButtonDefaults.outlinedButtonColors(containerColor = if (SokoColors.isDark) SokoMidnightBlue else androidx.compose.ui.graphics.Color(0xFFE0F2FE)),
                                             contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
                                             modifier = Modifier.height(32.dp)
                                         ) {
@@ -1451,8 +1452,8 @@ fun StatCard(
     Card(
         modifier = modifier
             .clip(RoundedCornerShape(12.dp))
-            .border(1.dp, SokoCardBorder, RoundedCornerShape(12.dp)),
-        colors = CardDefaults.cardColors(containerColor = SokoCardSurface)
+            .border(1.dp, SokoColors.cardBorder, RoundedCornerShape(12.dp)),
+        colors = CardDefaults.cardColors(containerColor = SokoColors.cardSurface)
     ) {
         Column(modifier = Modifier.padding(14.dp)) {
             Row(
@@ -1460,11 +1461,11 @@ fun StatCard(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(title, style = MaterialTheme.typography.bodySmall, color = SokoMutedText)
+                Text(title, style = MaterialTheme.typography.bodySmall, color = SokoColors.textMuted)
                 Icon(icon, contentDescription = title, tint = iconColor, modifier = Modifier.size(18.dp))
             }
             Spacer(modifier = Modifier.height(8.dp))
-            Text(value, style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Black), color = SokoLightText)
+            Text(value, style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Black), color = SokoColors.textPrimary)
         }
     }
 }

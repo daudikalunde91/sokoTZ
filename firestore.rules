@@ -15,6 +15,11 @@ service cloud.firestore {
       return resource.data;
     }
 
+    function isBusinessOwner(bizId) {
+      return exists(/databases/$(database)/documents/businesses/$(bizId)) &&
+             get(/databases/$(database)/documents/businesses/$(bizId)).data.ownerId == request.auth.uid;
+    }
+
     function isValidUser(data) {
       return data.userId is string && data.userId.size() <= 128 &&
              data.displayName is string && data.displayName.size() >= 1 && data.displayName.size() <= 100 &&
@@ -75,33 +80,72 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
-    // Users collection
+    // Users collection: users can only manage their own profile and cannot self-assign or escalate to ADMIN
     match /users/{userId} {
       allow get, list: if isSignedIn() && request.auth.uid == userId;
-      allow create: if isSignedIn() && request.auth.uid == userId && incoming().userId == request.auth.uid && isValidUser(incoming());
-      allow update: if isSignedIn() && request.auth.uid == userId && resource != null && incoming().userId == existing().userId && isValidUser(incoming());
+      allow create: if isSignedIn() &&
+                    request.auth.uid == userId &&
+                    incoming().userId == request.auth.uid &&
+                    incoming().role != 'ADMIN' &&
+                    isValidUser(incoming());
+      allow update: if isSignedIn() &&
+                    request.auth.uid == userId &&
+                    resource != null &&
+                    incoming().userId == existing().userId &&
+                    incoming().role == existing().role &&
+                    isValidUser(incoming());
       allow delete: if isSignedIn() && request.auth.uid == userId;
     }
 
-    // Businesses collection: public discovery, protected writes
+    // Businesses collection: public discovery, owner-protected writes, no self-verification or fabricated ratings
     match /businesses/{businessId} {
       allow get, list: if true;
-      allow create: if isSignedIn() && incoming().ownerId == request.auth.uid && isValidBusiness(incoming());
-      allow update: if isSignedIn() && resource != null && 'ownerId' in resource.data && resource.data.ownerId == request.auth.uid && incoming().ownerId == resource.data.ownerId && isValidBusiness(incoming());
-      allow delete: if isSignedIn() && resource != null && 'ownerId' in resource.data && resource.data.ownerId == request.auth.uid;
+      allow create: if isSignedIn() &&
+                    incoming().ownerId == request.auth.uid &&
+                    (!('isVerified' in incoming()) || incoming().isVerified == false) &&
+                    (!('rating' in incoming()) || incoming().rating == 0 || incoming().rating == 0.0) &&
+                    (!('reviewCount' in incoming()) || incoming().reviewCount == 0) &&
+                    isValidBusiness(incoming());
+      allow update: if isSignedIn() &&
+                    resource != null &&
+                    resource.data.ownerId == request.auth.uid &&
+                    incoming().ownerId == resource.data.ownerId &&
+                    incoming().isVerified == resource.data.isVerified &&
+                    (!('rating' in incoming()) || incoming().rating == resource.data.rating) &&
+                    (!('reviewCount' in incoming()) || incoming().reviewCount == resource.data.reviewCount) &&
+                    isValidBusiness(incoming());
+      allow delete: if isSignedIn() &&
+                    resource != null &&
+                    resource.data.ownerId == request.auth.uid;
     }
 
-    // Listings collection: public discovery, protected writes and atomic view counter
+    // Listings collection: public discovery, owner-protected writes, must link to own business, no self-featured placement
     match /listings/{listingId} {
       allow get, list: if true;
-      allow create: if isSignedIn() && incoming().ownerId == request.auth.uid && isValidListing(incoming());
+      allow create: if isSignedIn() &&
+                    incoming().ownerId == request.auth.uid &&
+                    (!('isFeatured' in incoming()) || incoming().isFeatured == false) &&
+                    (!('viewsCount' in incoming()) || incoming().viewsCount == 0) &&
+                    isBusinessOwner(incoming().businessId) &&
+                    isValidListing(incoming());
       allow update: if isSignedIn() && resource != null && (
-        (resource.data.ownerId == request.auth.uid && incoming().ownerId == resource.data.ownerId && isValidListing(incoming())) ||
-        (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['viewsCount', 'updatedAt']) && incoming().viewsCount == resource.data.viewsCount + 1)
+        (
+          resource.data.ownerId == request.auth.uid &&
+          incoming().ownerId == resource.data.ownerId &&
+          incoming().businessId == resource.data.businessId &&
+          incoming().isFeatured == resource.data.isFeatured &&
+          isValidListing(incoming())
+        ) ||
+        (
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['viewsCount', 'updatedAt']) &&
+          incoming().viewsCount == resource.data.viewsCount + 1
+        )
       );
-      allow delete: if isSignedIn() && resource != null && 'ownerId' in resource.data && resource.data.ownerId == request.auth.uid;
+      allow delete: if isSignedIn() &&
+                    resource != null &&
+                    resource.data.ownerId == request.auth.uid;
 
-      // Unique viewers subcollection
+      // Unique viewers subcollection: anti-abuse view counting
       match /viewers/{viewerId} {
         allow get, list: if isSignedIn();
         allow create: if isSignedIn() && request.auth.uid == viewerId;

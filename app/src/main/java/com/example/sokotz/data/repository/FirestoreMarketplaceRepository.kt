@@ -175,7 +175,6 @@ class FirestoreMarketplaceRepository(
     fun observeBusinesses(): Flow<List<BusinessProfile>> = _businesses
 
     suspend fun getBusiness(businessId: String): BusinessProfile? {
-        if (auth.currentUser == null) return null
         val path = "businesses/$businessId"
         return try {
             val doc = db.collection("businesses").document(businessId).get().await()
@@ -187,7 +186,6 @@ class FirestoreMarketplaceRepository(
     }
 
     suspend fun getListing(listingId: String): Listing? {
-        if (auth.currentUser == null) return null
         val path = "listings/$listingId"
         return try {
             val doc = db.collection("listings").document(listingId).get().await()
@@ -439,6 +437,12 @@ class FirestoreMarketplaceRepository(
 
     suspend fun incrementListingView(listingId: String) {
         val currentUser = auth.currentUser
+        val listing = getListingById(listingId)
+        // If current user is the owner of this listing, do NOT increment view count! (WhatsApp status behavior)
+        if (currentUser != null && listing?.ownerId == currentUser.uid) {
+            return
+        }
+
         val uid = currentUser?.uid ?: "guest"
         val userViewed = viewedListingsPerUser.getOrPut(uid) { mutableSetOf() }
         if (userViewed.contains(listingId)) {

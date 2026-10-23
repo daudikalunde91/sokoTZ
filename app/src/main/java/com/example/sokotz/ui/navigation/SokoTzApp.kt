@@ -187,7 +187,6 @@ fun SokoTzApp() {
                                 BottomNavTab.ASSISTANT -> Screen.Assistant
                                 BottomNavTab.BUSINESS -> Screen.BusinessHub
                                 BottomNavTab.ACCOUNT -> Screen.Account
-                                BottomNavTab.DISCOVER -> Screen.Discover
                             }
                         },
                         icon = {

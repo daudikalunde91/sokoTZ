@@ -1,4 +1,5 @@
 <?xml version="1.0" encoding="utf-8" standalone="no"?>
 <resources>
     <string name="firestore_database_id" translatable="false">ai-studio-android-sokotz-17bca192-1896-4b7e-b183-ea8b41319929</string>
+    <string name="default_web_client_id" translatable="false">sokotz-dummy-client-id.apps.googleusercontent.com</string>
 </resources>

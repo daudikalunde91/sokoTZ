@@ -140,7 +140,7 @@ fun AccountScreen(
                 Text(
                     text = if (isSw) "Akaunti ya SokoTZ" else "SokoTZ Account",
                     style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
-                    color = SokoLightText
+                    color = SokoColors.textPrimary
                 )
             }
         }
@@ -602,7 +602,7 @@ fun EditProfileDialog(
         title = {
             Text(
                 text = if (isSw) "Hariri Wasifu Wako" else "Edit Your Profile",
-                color = SokoLightText,
+                color = SokoColors.textPrimary,
                 fontWeight = FontWeight.Bold,
                 fontSize = 18.sp
             )
@@ -712,8 +712,8 @@ fun EditProfileDialog(
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedBorderColor = SokoNeonBlue,
                         unfocusedBorderColor = SokoCardBorder,
-                        focusedTextColor = SokoLightText,
-                        unfocusedTextColor = SokoLightText
+                        focusedTextColor = SokoColors.textPrimary,
+                        unfocusedTextColor = SokoColors.textPrimary
                     )
                 )
 
@@ -728,8 +728,8 @@ fun EditProfileDialog(
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedBorderColor = SokoNeonViolet,
                         unfocusedBorderColor = SokoCardBorder,
-                        focusedTextColor = SokoLightText,
-                        unfocusedTextColor = SokoLightText
+                        focusedTextColor = SokoColors.textPrimary,
+                        unfocusedTextColor = SokoColors.textPrimary
                     )
                 )
 
@@ -744,8 +744,8 @@ fun EditProfileDialog(
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedBorderColor = SokoNeonBlue,
                         unfocusedBorderColor = SokoCardBorder,
-                        focusedTextColor = SokoLightText,
-                        unfocusedTextColor = SokoLightText
+                        focusedTextColor = SokoColors.textPrimary,
+                        unfocusedTextColor = SokoColors.textPrimary
                     )
                 )
             }

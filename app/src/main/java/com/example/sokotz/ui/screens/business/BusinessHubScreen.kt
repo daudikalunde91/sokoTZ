@@ -259,7 +259,7 @@ fun BusinessHubScreen(
                         Text(
                             text = if (isSw) "Kituo cha Biashara Yako" else "Seller Hub & Management",
                             style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.ExtraBold),
-                            color = SokoLightText
+                            color = SokoColors.textPrimary
                         )
                         Text(
                             text = userBusiness?.name ?: if (isSw) "Bado hujasajili biashara rasmi" else "No business registered yet",
@@ -390,12 +390,12 @@ fun BusinessHubScreen(
                                     Text(
                                         text = if (isSw) "sokoTZ Msaidizi wa Kuandika Matangazo" else "sokoTZ AI Copywriter Assistant",
                                         style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                                        color = SokoLightText
+                                        color = SokoColors.textPrimary
                                     )
                                     Text(
                                         text = if (isSw) "Bofya hapa sokoTZ Msaidizi akusaidie kutunga maelezo ya mauzo" else "Chat with sokoTZ AI to draft sales copy and descriptions",
                                         style = MaterialTheme.typography.bodySmall,
-                                        color = SokoMutedText
+                                        color = SokoColors.textMuted
                                     )
                                 }
                             }
@@ -412,7 +412,7 @@ fun BusinessHubScreen(
                             Text(
                                 text = if (isSw) "Matangazo Yako (${businessListings.size})" else "Your Published Listings (${businessListings.size})",
                                 style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
-                                color = SokoLightText
+                                color = SokoColors.textPrimary
                             )
                             Button(
                                 onClick = { currentTab = 1 },
@@ -524,6 +524,32 @@ fun BusinessHubScreen(
                                         }
                                     }
                                 }
+
+                                Spacer(modifier = Modifier.height(8.dp))
+
+                                Button(
+                                    onClick = {
+                                        scope.launch {
+                                            val posterUri = repository.generateAdPoster(context, listing, scope)
+                                            if (posterUri != null) {
+                                                Toast.makeText(context, if (isSw) "Bango limezalishwa! Fungua sokoTZ Msaidizi kuliona." else "Ad poster generated! Check sokoTZ AI chat.", Toast.LENGTH_SHORT).show()
+                                                onNavigateToAssistant()
+                                            }
+                                        }
+                                    },
+                                    shape = RoundedCornerShape(8.dp),
+                                    colors = ButtonDefaults.buttonColors(containerColor = SokoNeonBlue),
+                                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                                    modifier = Modifier.fillMaxWidth().height(36.dp)
+                                ) {
+                                    Icon(Icons.Default.AutoAwesome, contentDescription = null, tint = SokoBlueBlack, modifier = Modifier.size(16.dp))
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(
+                                        text = if (isSw) "Tengeneza Bango la Tangazo (Ad Poster)" else "Generate Ad Poster",
+                                        color = SokoBlueBlack,
+                                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold)
+                                    )
+                                }
                             }
                         }
                     }
@@ -603,7 +629,7 @@ fun BusinessHubScreen(
                     Text(
                         text = if (isSw) "Chapisha Bidhaa au Huduma Mpya" else "Publish New Product or Service",
                         style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
-                        color = SokoLightText
+                        color = SokoColors.textPrimary
                     )
 
                     // Type toggle: Product vs Service
@@ -614,14 +640,14 @@ fun BusinessHubScreen(
                         Button(
                             onClick = { listingType = "PRODUCT" },
                             colors = ButtonDefaults.buttonColors(
-                                containerColor = if (listingType == "PRODUCT") SokoNeonBlue else SokoDeepNavy
+                                containerColor = if (listingType == "PRODUCT") SokoNeonBlue else (if (SokoColors.isDark) SokoDeepNavy else androidx.compose.ui.graphics.Color(0xFFE2E8F0))
                             ),
                             shape = RoundedCornerShape(8.dp),
                             modifier = Modifier.weight(1f)
                         ) {
                             Text(
                                 text = if (isSw) "Bidhaa (Product)" else "Product",
-                                color = if (listingType == "PRODUCT") SokoBlueBlack else SokoLightText,
+                                color = if (listingType == "PRODUCT") SokoBlueBlack else SokoColors.textPrimary,
                                 fontWeight = FontWeight.Bold
                             )
                         }
@@ -629,14 +655,14 @@ fun BusinessHubScreen(
                         Button(
                             onClick = { listingType = "SERVICE" },
                             colors = ButtonDefaults.buttonColors(
-                                containerColor = if (listingType == "SERVICE") SokoNeonViolet else SokoDeepNavy
+                                containerColor = if (listingType == "SERVICE") SokoNeonViolet else (if (SokoColors.isDark) SokoDeepNavy else androidx.compose.ui.graphics.Color(0xFFE2E8F0))
                             ),
                             shape = RoundedCornerShape(8.dp),
                             modifier = Modifier.weight(1f)
                         ) {
                             Text(
                                 text = if (isSw) "Huduma (Service)" else "Service",
-                                color = if (listingType == "SERVICE") SokoBlueBlack else SokoLightText,
+                                color = if (listingType == "SERVICE") (if (SokoColors.isDark) SokoBlueBlack else androidx.compose.ui.graphics.Color.White) else SokoColors.textPrimary,
                                 fontWeight = FontWeight.Bold
                             )
                         }
@@ -645,14 +671,14 @@ fun BusinessHubScreen(
                     // Product Photo Picker & Camera Section
                     Card(
                         modifier = Modifier.fillMaxWidth(),
-                        colors = CardDefaults.cardColors(containerColor = SokoCardSurface),
+                        colors = CardDefaults.cardColors(containerColor = SokoColors.cardSurface),
                         shape = RoundedCornerShape(12.dp)
                     ) {
                         Column(modifier = Modifier.padding(14.dp)) {
                             Text(
                                 text = if (isSw) "Picha ya Bidhaa / Huduma" else "Product / Service Photo",
                                 style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
-                                color = SokoLightText
+                                color = SokoColors.textPrimary
                             )
                             Spacer(modifier = Modifier.height(4.dp))
                             Text(
@@ -769,8 +795,8 @@ fun BusinessHubScreen(
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedBorderColor = SokoNeonBlue,
                             unfocusedBorderColor = SokoCardBorder,
-                            focusedTextColor = SokoLightText,
-                            unfocusedTextColor = SokoLightText
+                            focusedTextColor = SokoColors.textPrimary,
+                            unfocusedTextColor = SokoColors.textPrimary
                         )
                     )
 
@@ -785,8 +811,8 @@ fun BusinessHubScreen(
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedBorderColor = SokoNeonBlue,
                             unfocusedBorderColor = SokoCardBorder,
-                            focusedTextColor = SokoLightText,
-                            unfocusedTextColor = SokoLightText
+                            focusedTextColor = SokoColors.textPrimary,
+                            unfocusedTextColor = SokoColors.textPrimary
                         )
                     )
 
@@ -799,8 +825,8 @@ fun BusinessHubScreen(
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedBorderColor = SokoNeonBlue,
                             unfocusedBorderColor = SokoCardBorder,
-                            focusedTextColor = SokoLightText,
-                            unfocusedTextColor = SokoLightText
+                            focusedTextColor = SokoColors.textPrimary,
+                            unfocusedTextColor = SokoColors.textPrimary
                         )
                     )
 
@@ -860,8 +886,8 @@ fun BusinessHubScreen(
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedBorderColor = SokoNeonBlue,
                             unfocusedBorderColor = SokoCardBorder,
-                            focusedTextColor = SokoLightText,
-                            unfocusedTextColor = SokoLightText
+                            focusedTextColor = SokoColors.textPrimary,
+                            unfocusedTextColor = SokoColors.textPrimary
                         )
                     )
 
@@ -957,12 +983,12 @@ fun BusinessHubScreen(
                         else
                             (if (isSw) "Sajili Biashara Yako kwenye SokoTZ" else "Register Your Business on SokoTZ"),
                         style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
-                        color = SokoLightText
+                        color = SokoColors.textPrimary
                     )
                     Text(
                         text = if (isSw) "Taarifa zako zitahifadhiwa kwenye Firestore na kuonekana moja kwa moja nchini kote." else "Your business will be stored in Firestore and visible countrywide.",
                         style = MaterialTheme.typography.bodyMedium,
-                        color = SokoMutedText
+                        color = SokoColors.textMuted
                     )
 
                     OutlinedTextField(
@@ -975,8 +1001,8 @@ fun BusinessHubScreen(
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedBorderColor = SokoNeonBlue,
                             unfocusedBorderColor = SokoCardBorder,
-                            focusedTextColor = SokoLightText,
-                            unfocusedTextColor = SokoLightText
+                            focusedTextColor = SokoColors.textPrimary,
+                            unfocusedTextColor = SokoColors.textPrimary
                         )
                     )
 
@@ -988,8 +1014,8 @@ fun BusinessHubScreen(
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedBorderColor = SokoNeonBlue,
                             unfocusedBorderColor = SokoCardBorder,
-                            focusedTextColor = SokoLightText,
-                            unfocusedTextColor = SokoLightText
+                            focusedTextColor = SokoColors.textPrimary,
+                            unfocusedTextColor = SokoColors.textPrimary
                         )
                     )
 
@@ -1001,8 +1027,8 @@ fun BusinessHubScreen(
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedBorderColor = SokoNeonBlue,
                             unfocusedBorderColor = SokoCardBorder,
-                            focusedTextColor = SokoLightText,
-                            unfocusedTextColor = SokoLightText
+                            focusedTextColor = SokoColors.textPrimary,
+                            unfocusedTextColor = SokoColors.textPrimary
                         )
                     )
 
@@ -1014,8 +1040,8 @@ fun BusinessHubScreen(
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedBorderColor = SokoNeonBlue,
                             unfocusedBorderColor = SokoCardBorder,
-                            focusedTextColor = SokoLightText,
-                            unfocusedTextColor = SokoLightText
+                            focusedTextColor = SokoColors.textPrimary,
+                            unfocusedTextColor = SokoColors.textPrimary
                         )
                     )
 
@@ -1027,8 +1053,8 @@ fun BusinessHubScreen(
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedBorderColor = SokoNeonBlue,
                             unfocusedBorderColor = SokoCardBorder,
-                            focusedTextColor = SokoLightText,
-                            unfocusedTextColor = SokoLightText
+                            focusedTextColor = SokoColors.textPrimary,
+                            unfocusedTextColor = SokoColors.textPrimary
                         )
                     )
 
@@ -1042,8 +1068,8 @@ fun BusinessHubScreen(
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedBorderColor = SokoNeonBlue,
                             unfocusedBorderColor = SokoCardBorder,
-                            focusedTextColor = SokoLightText,
-                            unfocusedTextColor = SokoLightText
+                            focusedTextColor = SokoColors.textPrimary,
+                            unfocusedTextColor = SokoColors.textPrimary
                         )
                     )
 
@@ -1056,8 +1082,8 @@ fun BusinessHubScreen(
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedBorderColor = SokoNeonBlue,
                             unfocusedBorderColor = SokoCardBorder,
-                            focusedTextColor = SokoLightText,
-                            unfocusedTextColor = SokoLightText
+                            focusedTextColor = SokoColors.textPrimary,
+                            unfocusedTextColor = SokoColors.textPrimary
                         )
                     )
 
@@ -1173,12 +1199,12 @@ fun BusinessHubScreen(
     listingToDelete?.let { listing ->
         AlertDialog(
             onDismissRequest = { listingToDelete = null },
-            title = { Text(if (isSw) "Kufuta Tangazo" else "Delete Listing", color = SokoLightText, fontWeight = FontWeight.Bold) },
+            title = { Text(if (isSw) "Kufuta Tangazo" else "Delete Listing", color = SokoColors.textPrimary, fontWeight = FontWeight.Bold) },
             text = {
                 Text(
                     text = if (isSw) "Je, una uhakika unataka kufuta tangazo '${listing.titleSw}'? Halitaonekana tena kwenye SokoTZ."
                     else "Are you sure you want to delete '${listing.titleSw}'? It will no longer appear on SokoTZ.",
-                    color = SokoMutedText
+                    color = SokoColors.textMuted
                 )
             },
             confirmButton = {
@@ -1197,15 +1223,15 @@ fun BusinessHubScreen(
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = SokoError)
                 ) {
-                    Text(if (isSw) "Futa Kabisa" else "Delete Permanently", color = SokoLightText, fontWeight = FontWeight.Bold)
+                    Text(if (isSw) "Futa Kabisa" else "Delete Permanently", color = androidx.compose.ui.graphics.Color.White, fontWeight = FontWeight.Bold)
                 }
             },
             dismissButton = {
                 TextButton(onClick = { listingToDelete = null }) {
-                    Text(if (isSw) "Ghairi" else "Cancel", color = SokoMutedText)
+                    Text(if (isSw) "Ghairi" else "Cancel", color = SokoColors.textMuted)
                 }
             },
-            containerColor = SokoCardSurface
+            containerColor = SokoColors.cardSurface
         )
     }
 }
@@ -1283,7 +1309,7 @@ fun EditListingDialog(
         title = {
             Text(
                 text = if (isSw) "Hariri Tangazo Lako" else "Edit Your Listing",
-                color = SokoLightText,
+                color = SokoColors.textPrimary,
                 fontWeight = FontWeight.Bold,
                 fontSize = 18.sp
             )
@@ -1434,10 +1460,10 @@ fun EditListingDialog(
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text(if (isSw) "Ghairi" else "Cancel", color = SokoMutedText)
+                Text(if (isSw) "Ghairi" else "Cancel", color = SokoColors.textMuted)
             }
         },
-        containerColor = SokoCardSurface
+        containerColor = SokoColors.cardSurface
     )
 }
 

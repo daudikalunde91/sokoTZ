@@ -29,15 +29,20 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import java.util.UUID
 
+private fun provideFirestore(context: Context): FirebaseFirestore {
+    com.example.sokotz.data.util.FirebaseInitHelper.ensureInitialized(context)
+    return FirebaseFirestore.getInstance(
+        context.applicationContext.getString(R.string.firestore_database_id)
+    )
+}
+
 class FirestoreMarketplaceRepository(
     private val db: FirebaseFirestore,
     private val auth: FirebaseAuth = Firebase.auth
 ) {
 
     constructor(context: Context) : this(
-        FirebaseFirestore.getInstance(
-            context.applicationContext.getString(R.string.firestore_database_id)
-        ),
+        provideFirestore(context),
         Firebase.auth
     )
 
@@ -49,10 +54,10 @@ class FirestoreMarketplaceRepository(
     private val _categories = MutableStateFlow<List<Category>>(MarketplaceData.categories)
     val categories: StateFlow<List<Category>> = _categories.asStateFlow()
 
-    private val _businesses = MutableStateFlow<List<BusinessProfile>>(emptyList())
+    private val _businesses = MutableStateFlow<List<BusinessProfile>>(MarketplaceData.initialBusinesses)
     val businesses: StateFlow<List<BusinessProfile>> = _businesses.asStateFlow()
 
-    private val _listings = MutableStateFlow<List<Listing>>(emptyList())
+    private val _listings = MutableStateFlow<List<Listing>>(MarketplaceData.initialListings)
     val listings: StateFlow<List<Listing>> = _listings.asStateFlow()
 
     private val _language = MutableStateFlow(AppLanguage.SW)
@@ -131,34 +136,50 @@ class FirestoreMarketplaceRepository(
         if (businessesListener != null && listingsListener != null) return
 
         businessesListener?.remove()
-        businessesListener = db.collection("businesses")
-            .addSnapshotListener { snapshot, error ->
-                if (error != null) {
-                    handleFirestoreError(error, OperationType.LIST, "businesses")
-                    return@addSnapshotListener
-                }
-                if (snapshot != null) {
-                    val list = snapshot.documents.mapNotNull { doc ->
-                        doc.toObject(BusinessProfile::class.java)?.copy(id = doc.id)
+        businessesListener = try {
+            db.collection("businesses")
+                .addSnapshotListener { snapshot, error ->
+                    if (error != null) {
+                        handleFirestoreError(error, OperationType.LIST, "businesses")
+                        return@addSnapshotListener
                     }
-                    _businesses.value = list
+                    if (snapshot != null) {
+                        val firestoreList = snapshot.documents.mapNotNull { doc ->
+                            doc.toObject(BusinessProfile::class.java)?.copy(id = doc.id)
+                        }
+                        val combined = firestoreList + MarketplaceData.initialBusinesses.filter { seed ->
+                            firestoreList.none { it.id == seed.id }
+                        }
+                        _businesses.value = combined
+                    }
                 }
-            }
+        } catch (e: Exception) {
+            Log.e("FirestoreMarketplace", "Failed to attach businesses listener: ${e.message}")
+            null
+        }
 
         listingsListener?.remove()
-        listingsListener = db.collection("listings")
-            .addSnapshotListener { snapshot, error ->
-                if (error != null) {
-                    handleFirestoreError(error, OperationType.LIST, "listings")
-                    return@addSnapshotListener
-                }
-                if (snapshot != null) {
-                    val list = snapshot.documents.mapNotNull { doc ->
-                        doc.toObject(Listing::class.java)?.copy(id = doc.id)
+        listingsListener = try {
+            db.collection("listings")
+                .addSnapshotListener { snapshot, error ->
+                    if (error != null) {
+                        handleFirestoreError(error, OperationType.LIST, "listings")
+                        return@addSnapshotListener
                     }
-                    _listings.value = list
+                    if (snapshot != null) {
+                        val firestoreList = snapshot.documents.mapNotNull { doc ->
+                            doc.toObject(Listing::class.java)?.copy(id = doc.id)
+                        }
+                        val combined = firestoreList + MarketplaceData.initialListings.filter { seed ->
+                            firestoreList.none { it.id == seed.id }
+                        }
+                        _listings.value = combined
+                    }
                 }
-            }
+        } catch (e: Exception) {
+            Log.e("FirestoreMarketplace", "Failed to attach listings listener: ${e.message}")
+            null
+        }
     }
 
     private fun stopRealtimeListeners() {
@@ -166,8 +187,8 @@ class FirestoreMarketplaceRepository(
         businessesListener = null
         listingsListener?.remove()
         listingsListener = null
-        _businesses.value = emptyList()
-        _listings.value = emptyList()
+        _businesses.value = MarketplaceData.initialBusinesses
+        _listings.value = MarketplaceData.initialListings
     }
 
     fun observeListings(): Flow<List<Listing>> = _listings
@@ -324,6 +345,28 @@ class FirestoreMarketplaceRepository(
 
         return try {
             docRef.set(payload).await()
+            recordLocallyCreatedListing(docRef.id)
+            val newListing = Listing(
+                id = docRef.id,
+                businessId = businessId,
+                ownerId = currentUserId,
+                businessName = businessName,
+                titleSw = title.trim(),
+                titleEn = title.trim(),
+                descriptionSw = description.trim(),
+                descriptionEn = description.trim(),
+                priceTzs = priceTzs,
+                categorySlug = categorySlug,
+                type = type,
+                status = "PUBLISHED",
+                city = city.trim(),
+                isFeatured = false,
+                imageUrl = imageUrl.trim(),
+                viewsCount = 0L,
+                phoneNumber = phoneNumber.trim(),
+                whatsappNumber = whatsappNumber.trim()
+            )
+            _listings.value = listOf(newListing) + _listings.value.filter { it.id != docRef.id }
             Result.success(docRef.id)
         } catch (e: Exception) {
             handleFirestoreError(e, OperationType.CREATE, docRef.path)
@@ -433,16 +476,29 @@ class FirestoreMarketplaceRepository(
         }
     }
 
+    private val locallyCreatedListingIds = mutableSetOf<String>()
+
+    fun recordLocallyCreatedListing(listingId: String) {
+        locallyCreatedListingIds.add(listingId)
+    }
+
+    fun isOwnerOfListing(listingId: String): Boolean {
+        if (locallyCreatedListingIds.contains(listingId)) return true
+        val currentUid = auth.currentUser?.uid ?: return false
+        val listing = getListingById(listingId) ?: return false
+        return listing.ownerId == currentUid
+    }
+
     private val viewedListingsPerUser = mutableMapOf<String, MutableSet<String>>()
 
     suspend fun incrementListingView(listingId: String) {
-        val currentUser = auth.currentUser
-        val listing = getListingById(listingId)
-        // If current user is the owner of this listing, do NOT increment view count! (WhatsApp status behavior)
-        if (currentUser != null && listing?.ownerId == currentUser.uid) {
+        // If current user is the owner/creator of this listing, do NOT increment view count! (WhatsApp status behavior)
+        if (isOwnerOfListing(listingId)) {
+            Log.d("FirestoreRepo", "Skipping view count increment because viewer is listing owner: $listingId")
             return
         }
 
+        val currentUser = auth.currentUser
         val uid = currentUser?.uid ?: "guest"
         val userViewed = viewedListingsPerUser.getOrPut(uid) { mutableSetOf() }
         if (userViewed.contains(listingId)) {
@@ -479,14 +535,28 @@ class FirestoreMarketplaceRepository(
         }
     }
 
-    fun sendAssistantMessage(userText: String, scope: CoroutineScope) {
+    fun sendAssistantMessage(
+        userText: String,
+        scope: CoroutineScope,
+        attachmentBase64: String? = null,
+        attachmentMimeType: String? = null,
+        documentText: String? = null,
+        attachmentName: String? = null,
+        attachmentUri: String? = null
+    ) {
         val trimmed = userText.trim()
-        if (trimmed.isEmpty()) return
+        if (trimmed.isEmpty() && attachmentBase64 == null && documentText == null) return
+
+        val displayText = if (trimmed.isNotBlank()) trimmed else {
+            if (attachmentName != null) "Hati/Picha: $attachmentName" else "Picha iliyoambatanishwa"
+        }
 
         val userMsg = AssistantMessage(
             id = "user_${UUID.randomUUID()}",
             isUser = true,
-            text = trimmed
+            text = displayText,
+            attachedImageUri = attachmentUri,
+            attachedDocumentName = attachmentName
         )
         _assistantMessages.value = _assistantMessages.value + userMsg
         _isAssistantThinking.value = true
@@ -513,9 +583,12 @@ class FirestoreMarketplaceRepository(
                 val currentUserName = if (currentAiUserName.isNotBlank()) currentAiUserName else (auth.currentUser?.displayName ?: "")
                 val aiResponse = GeminiClient.chat(
                     conversationHistory = history,
-                    userMessage = trimmed,
+                    userMessage = trimmed.ifBlank { "Tafadhali chambua picha au hati hii niliyotuma." },
                     marketplaceContext = marketplaceContext,
-                    userName = currentUserName
+                    userName = currentUserName,
+                    attachmentBase64 = attachmentBase64,
+                    attachmentMimeType = attachmentMimeType,
+                    documentText = documentText
                 )
 
                 val matchedListings = _listings.value.filter { listing ->
@@ -559,6 +632,35 @@ class FirestoreMarketplaceRepository(
         }
     }
 
+    suspend fun generateAdPoster(
+        context: Context,
+        listing: Listing,
+        scope: CoroutineScope
+    ): String? {
+        val posterUri = com.example.sokotz.data.util.AdPosterGenerator.generatePoster(context, listing)
+        if (posterUri != null) {
+            val userPromptMsg = AssistantMessage(
+                id = "user_${UUID.randomUUID()}",
+                isUser = true,
+                text = "Tengeneza bango la tangazo (Ad Poster) kwa ajili ya: ${listing.titleSw}"
+            )
+            val isSw = _language.value == AppLanguage.SW
+            val aiPosterMsg = AssistantMessage(
+                id = "asst_${UUID.randomUUID()}",
+                isUser = false,
+                text = if (isSw)
+                    "[Bango Rasmi la Tangazo la SokoTZ]\nNimekutengenezea bango la tangazo lenye muonekano wa kuvutia kwa ajili ya bidhaa yako '${listing.titleSw}'. Unaweza kulihifadhi, kulishiriki kwenye WhatsApp Status, Instagram au Facebook!"
+                else
+                    "[Official SokoTZ Ad Poster]\nI have generated a professional promotional ad poster for '${listing.titleEn}'. You can save and share it across WhatsApp Status, Instagram, or Facebook!",
+                generatedAdImageUrl = posterUri
+            )
+            val updated = _assistantMessages.value + userPromptMsg + aiPosterMsg
+            _assistantMessages.value = updated
+            activeUserId?.let { uid -> userConversations[uid] = updated }
+        }
+        return posterUri
+    }
+
     fun clearAssistantConversation() {
         val welcome = getWelcomeMessage(auth.currentUser?.displayName ?: "")
         val freshList = listOf(welcome)
@@ -571,8 +673,10 @@ class FirestoreMarketplaceRepository(
         private var instance: FirestoreMarketplaceRepository? = null
 
         fun getInstance(context: Context): FirestoreMarketplaceRepository {
+            val appContext = context.applicationContext ?: context
+            com.example.sokotz.data.util.FirebaseInitHelper.ensureInitialized(appContext)
             return instance ?: synchronized(this) {
-                instance ?: FirestoreMarketplaceRepository(context.applicationContext).also { instance = it }
+                instance ?: FirestoreMarketplaceRepository(appContext).also { instance = it }
             }
         }
     }

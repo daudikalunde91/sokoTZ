@@ -30,7 +30,10 @@ import kotlinx.coroutines.tasks.await
 
 class AuthManager(private val context: Context) {
 
-    private val auth: FirebaseAuth = Firebase.auth
+    private val auth: FirebaseAuth = run {
+        com.example.sokotz.data.util.FirebaseInitHelper.ensureInitialized(context)
+        Firebase.auth
+    }
     private val credentialManager: CredentialManager = CredentialManager.create(context)
 
     private val _currentUser = MutableStateFlow<FirebaseUser?>(auth.currentUser)
@@ -58,6 +61,7 @@ class AuthManager(private val context: Context) {
     }
 
     private fun getDb(): FirebaseFirestore {
+        com.example.sokotz.data.util.FirebaseInitHelper.ensureInitialized(context)
         val dbId = context.getString(R.string.firestore_database_id)
         return FirebaseFirestore.getInstance(dbId)
     }
@@ -499,8 +503,10 @@ class AuthManager(private val context: Context) {
         private var instance: AuthManager? = null
 
         fun getInstance(context: Context): AuthManager {
+            val appContext = context.applicationContext ?: context
+            com.example.sokotz.data.util.FirebaseInitHelper.ensureInitialized(appContext)
             return instance ?: synchronized(this) {
-                instance ?: AuthManager(context.applicationContext).also { instance = it }
+                instance ?: AuthManager(appContext).also { instance = it }
             }
         }
     }

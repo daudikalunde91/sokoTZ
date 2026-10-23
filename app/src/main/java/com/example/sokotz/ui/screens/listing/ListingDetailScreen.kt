@@ -125,13 +125,13 @@ fun ListingDetailScreen(
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = "Back",
-                            tint = SokoLightText
+                            tint = SokoColors.textPrimary
                         )
                     }
                     Text(
                         text = if (isSw) "Maelezo ya Tangazo" else "Listing Details",
                         style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
-                        color = SokoLightText
+                        color = SokoColors.textPrimary
                     )
                 }
 
@@ -211,7 +211,8 @@ fun ListingDetailScreen(
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            // Views Tracker Badge
+            // Views Tracker Badge (WhatsApp-status style behavior)
+            val isOwner = repository.isOwnerOfListing(listing.id)
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier
@@ -227,11 +228,20 @@ fun ListingDetailScreen(
                     modifier = Modifier.size(16.dp)
                 )
                 Spacer(modifier = Modifier.width(6.dp))
+                val viewLabel = if (isOwner) {
+                    if (listing.viewsCount == 0L) {
+                        if (isSw) "Bado hakuna mteja aliyeona tangazo hili (Watazamaji: 0 - Tangazo Lako)"
+                        else "No customer has viewed this listing yet (0 views - Your listing)"
+                    } else {
+                        if (isSw) "Watazamaji ${listing.viewsCount} wameona tangazo hili (Tangazo Lako)"
+                        else "${listing.viewsCount} customers have viewed this (Your listing)"
+                    }
+                } else {
+                    if (isSw) "Watazamaji ${listing.viewsCount} wameona tangazo hili"
+                    else "${listing.viewsCount} people have viewed this listing"
+                }
                 Text(
-                    text = if (isSw)
-                        "Watazamaji ${listing.viewsCount} wameona tangazo hili"
-                    else
-                        "${listing.viewsCount} people have viewed this listing",
+                    text = viewLabel,
                     style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.SemiBold),
                     color = SokoColors.textPrimary
                 )

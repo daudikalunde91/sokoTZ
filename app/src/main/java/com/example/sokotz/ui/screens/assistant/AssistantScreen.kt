@@ -3,8 +3,14 @@ package com.example.sokotz.ui.screens.assistant
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
+import android.content.Intent
+import android.net.Uri
 import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -14,10 +20,12 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.isImeVisible
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -28,12 +36,16 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AutoAwesome
-import androidx.compose.material.icons.filled.ContentCopy
-import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.Login
-import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.filled.AttachFile
+import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.Description
+import androidx.compose.material.icons.filled.Image
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -58,20 +70,23 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.google.firebase.auth.FirebaseUser
+import androidx.core.content.FileProvider
+import coil.compose.AsyncImage
 import com.example.sokotz.data.model.AppLanguage
 import com.example.sokotz.data.model.AssistantMessage
 import com.example.sokotz.data.repository.FirestoreMarketplaceRepository
+import com.example.sokotz.data.util.DocumentReader
+import com.example.sokotz.data.util.ParsedAttachment
 import com.example.sokotz.ui.components.ListingCard
-import com.example.ui.theme.SokoColors
 import com.example.ui.theme.SokoBlueBlack
-import com.example.ui.theme.SokoCardBorder
-import com.example.ui.theme.SokoCardSurface
+import com.example.ui.theme.SokoColors
 import com.example.ui.theme.SokoDeepNavy
 import com.example.ui.theme.SokoDeepPurple
 import com.example.ui.theme.SokoGradients
@@ -80,6 +95,9 @@ import com.example.ui.theme.SokoMidnightBlue
 import com.example.ui.theme.SokoMutedText
 import com.example.ui.theme.SokoNeonBlue
 import com.example.ui.theme.SokoNeonViolet
+import com.google.firebase.auth.FirebaseUser
+import kotlinx.coroutines.launch
+import java.io.File
 
 @Composable
 fun AssistantScreen(
@@ -97,9 +115,38 @@ fun AssistantScreen(
     val isSw = language == AppLanguage.SW
 
     var inputText by remember { mutableStateOf("") }
+    var currentAttachment by remember { mutableStateOf<ParsedAttachment?>(null) }
+    var attachedUriString by remember { mutableStateOf<String?>(null) }
     val listState = rememberLazyListState()
 
-    LaunchedEffect(messages.size, isThinking) {
+    // Activity Result Launchers for Photos and Documents
+    val photoPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickVisualMedia()
+    ) { uri: Uri? ->
+        if (uri != null) {
+            val parsed = DocumentReader.parseAttachment(context, uri)
+            if (parsed != null) {
+                currentAttachment = parsed
+                attachedUriString = uri.toString()
+            }
+        }
+    }
+
+    val documentPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument()
+    ) { uri: Uri? ->
+        if (uri != null) {
+            val parsed = DocumentReader.parseAttachment(context, uri)
+            if (parsed != null) {
+                currentAttachment = parsed
+                attachedUriString = uri.toString()
+            }
+        }
+    }
+
+    // Auto-scroll when new messages arrive, thinking state toggles, or keyboard appears
+    val isImeVisible = WindowInsets.isImeVisible
+    LaunchedEffect(messages.size, isThinking, isImeVisible) {
         if (messages.isNotEmpty()) {
             listState.animateScrollToItem(messages.size - 1)
         }
@@ -169,13 +216,17 @@ fun AssistantScreen(
 
                 // New conversation action
                 IconButton(
-                    onClick = { repository.clearAssistantConversation() },
+                    onClick = {
+                        currentAttachment = null
+                        attachedUriString = null
+                        repository.clearAssistantConversation()
+                    },
                     modifier = Modifier.testTag("new_conversation_button")
                 ) {
                     Icon(
                         imageVector = Icons.Default.Refresh,
                         contentDescription = "New Conversation",
-                        tint = SokoMutedText
+                        tint = SokoColors.textMuted
                     )
                 }
             }
@@ -237,7 +288,7 @@ fun AssistantScreen(
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(vertical = 4.dp),
+                            .padding(vertical = 6.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         CircularProgressIndicator(
@@ -256,17 +307,57 @@ fun AssistantScreen(
                 }
             }
 
-            // Suggested queries chip block
+            // Suggested queries chip block + Ad Poster Generator quick action
             if (messages.size <= 2 && !isThinking) {
                 item {
                     Spacer(modifier = Modifier.height(10.dp))
                     Text(
-                        text = if (isSw) "Maswali Yanayopendekezwa:" else "Suggested Questions:",
+                        text = if (isSw) "Vitendo vya Haraka & Maswali:" else "Quick Actions & Questions:",
                         style = MaterialTheme.typography.labelMedium,
                         color = SokoNeonBlue
                     )
                     Spacer(modifier = Modifier.height(8.dp))
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        // Quick Action: Ad Poster Generator
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(SokoColors.cardSurface)
+                                .border(1.dp, SokoNeonBlue.copy(alpha = 0.6f), RoundedCornerShape(10.dp))
+                                .clickable {
+                                    val listings = repository.listings.value
+                                    val targetListing = listings.firstOrNull { repository.isOwnerOfListing(it.id) } ?: listings.firstOrNull()
+                                    if (targetListing != null) {
+                                        scope.launch {
+                                            repository.generateAdPoster(context, targetListing, scope)
+                                        }
+                                    } else {
+                                        repository.sendAssistantMessage("Nisaidie kutengeneza bango la tangazo (Ad poster) kwa ajili ya bidhaa yangu.", scope)
+                                    }
+                                }
+                                .padding(horizontal = 12.dp, vertical = 10.dp)
+                                .testTag("generate_poster_quick_action")
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = if (isSw) "Tengeneza Picha/Bango la Tangazo (Ad Poster)" else "Generate Promotional Ad Poster",
+                                    style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+                                    color = SokoNeonBlue
+                                )
+                                Icon(
+                                    imageVector = Icons.Default.AutoAwesome,
+                                    contentDescription = "Ad Poster",
+                                    tint = SokoNeonBlue,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
+                        }
+
                         suggestedQuestions.forEach { question ->
                             Box(
                                 modifier = Modifier
@@ -335,18 +426,120 @@ fun AssistantScreen(
                     }
                     HorizontalDivider(color = SokoColors.cardBorder, thickness = 1.dp)
                 }
+
+                // Attachment preview pill if a photo or document was picked
+                currentAttachment?.let { attachment ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(SokoColors.inputBackground)
+                            .padding(horizontal = 12.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            if (attachment.previewBitmap != null) {
+                                Image(
+                                    bitmap = attachment.previewBitmap.asImageBitmap(),
+                                    contentDescription = "Attached thumbnail",
+                                    modifier = Modifier
+                                        .size(36.dp)
+                                        .clip(RoundedCornerShape(6.dp)),
+                                    contentScale = ContentScale.Crop
+                                )
+                            } else {
+                                Icon(
+                                    imageVector = Icons.Default.Description,
+                                    contentDescription = "Document",
+                                    tint = SokoNeonBlue,
+                                    modifier = Modifier.size(24.dp)
+                                )
+                            }
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Column {
+                                Text(
+                                    text = attachment.name,
+                                    style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold),
+                                    color = SokoColors.textPrimary,
+                                    maxLines = 1
+                                )
+                                Text(
+                                    text = if (attachment.base64Data != null)
+                                        (if (isSw) "Picha/Hati ipo tayari kusomwa" else "Image/Document ready for analysis")
+                                    else
+                                        (if (isSw) "Hati ya maandishi" else "Text Document"),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = SokoColors.textMuted
+                                )
+                            }
+                        }
+                        IconButton(
+                            onClick = {
+                                currentAttachment = null
+                                attachedUriString = null
+                            },
+                            modifier = Modifier.size(32.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Close,
+                                contentDescription = "Remove attachment",
+                                tint = SokoColors.textMuted,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                    }
+                    HorizontalDivider(color = SokoColors.cardBorder, thickness = 1.dp)
+                }
+
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(12.dp),
+                        .padding(horizontal = 8.dp, vertical = 8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
+                    // Photo Upload Button
+                    IconButton(
+                        onClick = {
+                            photoPickerLauncher.launch(
+                                PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                            )
+                        },
+                        enabled = !isThinking,
+                        modifier = Modifier.size(40.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Image,
+                            contentDescription = "Upload Photo",
+                            tint = SokoNeonBlue
+                        )
+                    }
+
+                    // Document Upload Button
+                    IconButton(
+                        onClick = {
+                            documentPickerLauncher.launch(
+                                arrayOf("application/pdf", "text/plain", "image/*")
+                            )
+                        },
+                        enabled = !isThinking,
+                        modifier = Modifier.size(40.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.AttachFile,
+                            contentDescription = "Upload Document",
+                            tint = SokoNeonViolet
+                        )
+                    }
+
                     OutlinedTextField(
                         value = inputText,
                         onValueChange = { inputText = it },
                         placeholder = {
                             Text(
-                                text = if (isSw) "Uliza kwa Kiswahili au Kiingereza..." else "Ask in Kiswahili or English...",
+                                text = if (isSw) "Uliza au ambatanisha picha/hati..." else "Ask or attach photo/document...",
                                 color = SokoColors.textMuted,
                                 style = MaterialTheme.typography.bodyMedium
                             )
@@ -365,26 +558,41 @@ fun AssistantScreen(
                         maxLines = 3,
                         enabled = !isThinking
                     )
-                    Spacer(modifier = Modifier.width(8.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+
+                    val canSend = (inputText.isNotBlank() || currentAttachment != null) && !isThinking
                     IconButton(
                         onClick = {
-                            if (inputText.isNotBlank() && !isThinking) {
+                            if (canSend) {
                                 val textToSend = inputText
+                                val attachment = currentAttachment
+                                val uriString = attachedUriString
                                 inputText = ""
-                                repository.sendAssistantMessage(textToSend, scope)
+                                currentAttachment = null
+                                attachedUriString = null
+
+                                repository.sendAssistantMessage(
+                                    userText = textToSend,
+                                    scope = scope,
+                                    attachmentBase64 = attachment?.base64Data,
+                                    attachmentMimeType = attachment?.mimeType,
+                                    documentText = attachment?.extractedText,
+                                    attachmentName = attachment?.name,
+                                    attachmentUri = uriString
+                                )
                             }
                         },
-                        enabled = inputText.isNotBlank() && !isThinking,
+                        enabled = canSend,
                         modifier = Modifier
-                            .size(48.dp)
+                            .size(44.dp)
                             .clip(CircleShape)
-                            .background(if (inputText.isNotBlank() && !isThinking) SokoNeonBlue else SokoColors.cardBorder)
+                            .background(if (canSend) SokoNeonBlue else SokoColors.cardBorder)
                             .testTag("assistant_send_button")
                     ) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.Send,
                             contentDescription = "Send",
-                            tint = if (inputText.isNotBlank() && !isThinking) SokoBlueBlack else SokoColors.textMuted
+                            tint = if (canSend) SokoBlueBlack else SokoColors.textMuted
                         )
                     }
                 }
@@ -400,6 +608,7 @@ fun MessageBubble(
     onNavigateToListing: (String) -> Unit,
     onCopyText: (String) -> Unit
 ) {
+    val context = LocalContext.current
     val isUser = message.isUser
     Column(
         modifier = Modifier.fillMaxWidth(),
@@ -440,12 +649,111 @@ fun MessageBubble(
             )
         ) {
             Column(modifier = Modifier.padding(14.dp)) {
+                // Attached image thumbnail if user uploaded one
+                if (!message.attachedImageUri.isNullOrBlank()) {
+                    AsyncImage(
+                        model = message.attachedImageUri,
+                        contentDescription = "Attached Image",
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(180.dp)
+                            .clip(RoundedCornerShape(10.dp)),
+                        contentScale = ContentScale.Crop
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                }
+
+                // Attached document indicator chip
+                if (!message.attachedDocumentName.isNullOrBlank() && message.attachedImageUri.isNullOrBlank()) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(SokoColors.inputBackground)
+                            .padding(horizontal = 8.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Description,
+                            contentDescription = "Attached Document",
+                            tint = SokoNeonBlue,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = message.attachedDocumentName,
+                            style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold),
+                            color = SokoColors.textPrimary,
+                            maxLines = 1
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
+                }
+
+                // Message Text
                 Text(
                     text = message.text,
                     style = MaterialTheme.typography.bodyLarge,
                     color = SokoColors.textPrimary,
                     lineHeight = 22.sp
                 )
+
+                // Generated Ad Poster Banner
+                if (!message.generatedAdImageUrl.isNullOrBlank()) {
+                    Spacer(modifier = Modifier.height(12.dp))
+                    AsyncImage(
+                        model = File(message.generatedAdImageUrl),
+                        contentDescription = "Generated SokoTZ Ad Poster",
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(240.dp)
+                            .clip(RoundedCornerShape(12.dp))
+                            .border(1.dp, SokoNeonBlue, RoundedCornerShape(12.dp)),
+                        contentScale = ContentScale.Fit
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(SokoNeonBlue)
+                            .clickable {
+                                try {
+                                    val posterFile = File(message.generatedAdImageUrl)
+                                    val contentUri = FileProvider.getUriForFile(
+                                        context,
+                                        "${context.packageName}.fileprovider",
+                                        posterFile
+                                    )
+                                    val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                                        type = "image/jpeg"
+                                        putExtra(Intent.EXTRA_STREAM, contentUri)
+                                        putExtra(Intent.EXTRA_TEXT, "Bango langu jipya kwenye SokoTZ! Nunua na uuze kwa uhakika.")
+                                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                    }
+                                    context.startActivity(Intent.createChooser(shareIntent, "Shiriki Bango la Tangazo"))
+                                } catch (e: Exception) {
+                                    Toast.makeText(context, "Hifadhi ya picha ipo kwenye kifaa chako.", Toast.LENGTH_SHORT).show()
+                                }
+                            }
+                            .padding(vertical = 8.dp),
+                        horizontalArrangement = Arrangement.Center,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Share,
+                            contentDescription = "Share Poster",
+                            tint = SokoBlueBlack,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = if (language == AppLanguage.SW) "Shiriki Bango (WhatsApp / Status)" else "Share Ad Poster",
+                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                            color = SokoBlueBlack
+                        )
+                    }
+                }
 
                 // If this is an AI drafting suggestion, provide a prominent copy button
                 if (message.isAiDraft) {

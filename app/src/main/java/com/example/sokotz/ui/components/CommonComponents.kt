@@ -118,7 +118,7 @@ fun SokoTzHeader(
                     Text(
                         text = "SokoTZ",
                         style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.ExtraBold),
-                        color = SokoLightText
+                        color = SokoColors.textPrimary
                     )
                     Text(
                         text = if (currentLanguage == AppLanguage.SW) "Soko Lako la Kidijitali" else "Tanzania Marketplace",
@@ -132,8 +132,8 @@ fun SokoTzHeader(
             Row(
                 modifier = Modifier
                     .clip(RoundedCornerShape(20.dp))
-                    .border(1.dp, SokoCardBorder, RoundedCornerShape(20.dp))
-                    .background(SokoDeepNavy)
+                    .border(1.dp, SokoColors.cardBorder, RoundedCornerShape(20.dp))
+                    .background(if (SokoColors.isDark) SokoDeepNavy else androidx.compose.ui.graphics.Color(0xFFE2E8F0))
                     .clickable { onToggleLanguage() }
                     .padding(horizontal = 10.dp, vertical = 6.dp)
                     .testTag("language_toggle_button"),
@@ -149,7 +149,7 @@ fun SokoTzHeader(
                 Text(
                     text = currentLanguage.name,
                     style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
-                    color = SokoLightText
+                    color = SokoColors.textPrimary
                 )
             }
         }

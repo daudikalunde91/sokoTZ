@@ -5,6 +5,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.isImeVisible
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
@@ -91,6 +92,7 @@ enum class BottomNavTab(
     ACCOUNT("Akaunti", "Account", Icons.Filled.AccountCircle, Icons.Outlined.AccountCircle, "nav_tab_account")
 }
 
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
 fun SokoTzApp() {
     val context = LocalContext.current
@@ -160,59 +162,61 @@ fun SokoTzApp() {
             }
         },
         bottomBar = {
-            NavigationBar(
-                containerColor = SokoColors.navBarSurface,
-                contentColor = SokoColors.textPrimary,
-                modifier = Modifier
-                    .clip(RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp))
-                    .border(1.dp, SokoColors.cardBorder, RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp)),
-                windowInsets = WindowInsets.navigationBars
-            ) {
-                BottomNavTab.values().forEach { tab ->
-                    val isSelected = selectedTab == tab && (
-                            (tab == BottomNavTab.DISCOVER && currentScreen is Screen.Discover) ||
-                            (tab == BottomNavTab.SEARCH && currentScreen is Screen.Search) ||
-                            (tab == BottomNavTab.ASSISTANT && currentScreen is Screen.Assistant) ||
-                            (tab == BottomNavTab.BUSINESS && currentScreen is Screen.BusinessHub) ||
-                            (tab == BottomNavTab.ACCOUNT && currentScreen is Screen.Account)
-                    )
+            if (!WindowInsets.isImeVisible) {
+                NavigationBar(
+                    containerColor = SokoColors.navBarSurface,
+                    contentColor = SokoColors.textPrimary,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp))
+                        .border(1.dp, SokoColors.cardBorder, RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp)),
+                    windowInsets = WindowInsets.navigationBars
+                ) {
+                    BottomNavTab.values().forEach { tab ->
+                        val isSelected = selectedTab == tab && (
+                                (tab == BottomNavTab.DISCOVER && currentScreen is Screen.Discover) ||
+                                (tab == BottomNavTab.SEARCH && currentScreen is Screen.Search) ||
+                                (tab == BottomNavTab.ASSISTANT && currentScreen is Screen.Assistant) ||
+                                (tab == BottomNavTab.BUSINESS && currentScreen is Screen.BusinessHub) ||
+                                (tab == BottomNavTab.ACCOUNT && currentScreen is Screen.Account)
+                        )
 
-                    NavigationBarItem(
-                        selected = isSelected,
-                        onClick = {
-                            selectedTab = tab
-                            currentScreen = when (tab) {
-                                BottomNavTab.DISCOVER -> Screen.Discover
-                                BottomNavTab.SEARCH -> Screen.Search()
-                                BottomNavTab.ASSISTANT -> Screen.Assistant
-                                BottomNavTab.BUSINESS -> Screen.BusinessHub
-                                BottomNavTab.ACCOUNT -> Screen.Account
-                            }
-                        },
-                        icon = {
-                            Icon(
-                                imageVector = if (isSelected) tab.activeIcon else tab.inactiveIcon,
-                                contentDescription = if (isSw) tab.titleSw else tab.titleEn,
-                                tint = if (isSelected) SokoNeonBlue else SokoColors.textMuted,
-                                modifier = Modifier.size(22.dp)
-                            )
-                        },
-                        label = {
-                            Text(
-                                text = if (isSw) tab.titleSw else tab.titleEn,
-                                fontSize = 10.sp,
-                                maxLines = 1,
-                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                                color = if (isSelected) SokoNeonBlue else SokoColors.textMuted
-                            )
-                        },
-                        colors = NavigationBarItemDefaults.colors(
-                            indicatorColor = if (SokoColors.isDark) SokoDeepNavy else androidx.compose.ui.graphics.Color(0xFFE0F2FE),
-                            selectedIconColor = SokoNeonBlue,
-                            unselectedIconColor = SokoColors.textMuted
-                        ),
-                        modifier = Modifier.testTag(tab.testTag)
-                    )
+                        NavigationBarItem(
+                            selected = isSelected,
+                            onClick = {
+                                selectedTab = tab
+                                currentScreen = when (tab) {
+                                    BottomNavTab.DISCOVER -> Screen.Discover
+                                    BottomNavTab.SEARCH -> Screen.Search()
+                                    BottomNavTab.ASSISTANT -> Screen.Assistant
+                                    BottomNavTab.BUSINESS -> Screen.BusinessHub
+                                    BottomNavTab.ACCOUNT -> Screen.Account
+                                }
+                            },
+                            icon = {
+                                Icon(
+                                    imageVector = if (isSelected) tab.activeIcon else tab.inactiveIcon,
+                                    contentDescription = if (isSw) tab.titleSw else tab.titleEn,
+                                    tint = if (isSelected) SokoNeonBlue else SokoColors.textMuted,
+                                    modifier = Modifier.size(22.dp)
+                                )
+                            },
+                            label = {
+                                Text(
+                                    text = if (isSw) tab.titleSw else tab.titleEn,
+                                    fontSize = 10.sp,
+                                    maxLines = 1,
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                    color = if (isSelected) SokoNeonBlue else SokoColors.textMuted
+                                )
+                            },
+                            colors = NavigationBarItemDefaults.colors(
+                                indicatorColor = if (SokoColors.isDark) SokoDeepNavy else androidx.compose.ui.graphics.Color(0xFFE0F2FE),
+                                selectedIconColor = SokoNeonBlue,
+                                unselectedIconColor = SokoColors.textMuted
+                            ),
+                            modifier = Modifier.testTag(tab.testTag)
+                        )
+                    }
                 }
             }
         }

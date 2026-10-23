@@ -117,5 +117,8 @@ data class AssistantMessage(
     val text: String = "",
     val referencedListings: List<Listing> = emptyList(),
     val timestamp: Long = System.currentTimeMillis(),
-    val isAiDraft: Boolean = false
+    val isAiDraft: Boolean = false,
+    val attachedImageUri: String? = null,
+    val attachedDocumentName: String? = null,
+    val generatedAdImageUrl: String? = null
 )

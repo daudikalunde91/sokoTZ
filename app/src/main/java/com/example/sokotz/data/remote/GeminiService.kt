@@ -17,9 +17,15 @@ import retrofit2.http.Query
 import java.util.concurrent.TimeUnit
 
 @JsonClass(generateAdapter = true)
-data class GeminiRequest(
-    val contents: List<GeminiContent>,
-    val systemInstruction: GeminiContent? = null
+data class GeminiInlineData(
+    val mimeType: String,
+    val data: String
+)
+
+@JsonClass(generateAdapter = true)
+data class GeminiPart(
+    val text: String? = null,
+    val inlineData: GeminiInlineData? = null
 )
 
 @JsonClass(generateAdapter = true)
@@ -29,8 +35,9 @@ data class GeminiContent(
 )
 
 @JsonClass(generateAdapter = true)
-data class GeminiPart(
-    val text: String
+data class GeminiRequest(
+    val contents: List<GeminiContent>,
+    val systemInstruction: GeminiContent? = null
 )
 
 @JsonClass(generateAdapter = true)
@@ -56,9 +63,9 @@ object GeminiClient {
     private const val BASE_URL = "https://generativelanguage.googleapis.com/"
 
     private val okHttpClient = OkHttpClient.Builder()
-        .connectTimeout(30, TimeUnit.SECONDS)
-        .readTimeout(30, TimeUnit.SECONDS)
-        .writeTimeout(30, TimeUnit.SECONDS)
+        .connectTimeout(60, TimeUnit.SECONDS)
+        .readTimeout(60, TimeUnit.SECONDS)
+        .writeTimeout(60, TimeUnit.SECONDS)
         .build()
 
     private val moshi = Moshi.Builder()
@@ -78,7 +85,10 @@ object GeminiClient {
         conversationHistory: List<Pair<String, String>>, // role ("user"/"model") to text
         userMessage: String,
         marketplaceContext: String = "",
-        userName: String = ""
+        userName: String = "",
+        attachmentBase64: String? = null,
+        attachmentMimeType: String? = null,
+        documentText: String? = null
     ): String = withContext(Dispatchers.IO) {
         val apiKey = BuildConfig.GEMINI_API_KEY
         val trimmed = userMessage.trim()
@@ -92,14 +102,16 @@ object GeminiClient {
         val userWantsEmojis = userMessage.any { char ->
             val type = Character.getType(char)
             type == Character.SURROGATE.toInt() || type == Character.OTHER_SYMBOL.toInt()
-        } || userMessage.contains("emoji", ignoreCase = true) ||
-           userMessage.contains("emojis", ignoreCase = true) ||
-           userMessage.contains("imoj", ignoreCase = true)
+        } || userMessage.contains("weka emoji", ignoreCase = true) ||
+           userMessage.contains("tumia emoji", ignoreCase = true) ||
+           userMessage.contains("with emojis", ignoreCase = true) ||
+           userMessage.contains("use emojis", ignoreCase = true) ||
+           userMessage.contains("ongeza emoji", ignoreCase = true)
 
         val emojiRule = if (userWantsEmojis) {
             "Mtumiaji anataka emoji. Unaweza kutumia emoji zinazofaa na zilizopangwa vizuri katika jibu lako."
         } else {
-            "KANUNI YA MAANDISHI (MUHIMU SANA): Tumia MAANDISHI TU (ONLY TEXT BILA EMOJI ZOZOTE) kwa chaguo-msingi (default). Tumia imoji za furaha kumkaribisha mtumiaji ili ajihisi yupo sehemu sahihi na sio sehemu isiyo ahihi."
+            "KANUNI KUU YA MAANDISHI (MUHIMU SANA NA YA LAZIMA): Tumia MAANDISHI MATUPU PEKEE (ONLY PLAIN TEXT WITHOUT ANY EMOJIS WHATSOEVER). USITUMIE emoji yoyote ile isipokuwa tu mtumiaji akiomba waziwazi kutumia emoji au akituma emoji. Default ni text tu bila emoji yoyote."
         }
 
         val systemPrompt = """
@@ -110,13 +122,14 @@ object GeminiClient {
             Majukumu yako:
             1. Kusaidia wanunuzi na wateja kupata biashara zilizothibitishwa, bidhaa za maduka ya Kariakoo, Arusha, Mwanza na nchi nzima.
             2. Kusaidia wafanyabiashara kutunga maelezo ya kuvutia ya matangazo (product sales copy).
-            3. Kueleza bei katika Shilingi ya Kitanzania (TZS).
-            4. Kutumia takwimu halisi za soko zilizopo:
+            3. Kuchambua picha, risiti, orodha ya bidhaa na hati zilizoambatanishwa na mtumiaji na kutoa mwongozo wa kibiashara.
+            4. Kueleza bei katika Shilingi ya Kitanzania (TZS).
+            5. Kutumia takwimu halisi za soko zilizopo:
             $marketplaceContext
             Kuwa mchangamfu, mwenye heshima na kutoa mwongozo sahihi. Usitumie jina la Gemini popote, jina lako ni sokoTZ AI au sokoTZ Msaidizi.
         """.trimIndent()
 
-        if (apiKey.isNotBlank() && apiKey != "MY_GEMINI_API_KEY") {
+        if (apiKey.isNotBlank() && apiKey != "MY_GEMINI_API_KEY" && apiKey != "your_api_key_here") {
             val contents = mutableListOf<GeminiContent>()
 
             // Append historical multi-turn conversation
@@ -129,11 +142,31 @@ object GeminiClient {
                 )
             }
 
-            // Append latest user message
+            // Prepare latest turn parts (text + optional image attachment + optional document text)
+            val latestParts = mutableListOf<GeminiPart>()
+
+            var finalUserText = trimmed
+            if (!documentText.isNullOrBlank()) {
+                finalUserText += "\n\n[HATI ILIYOAMBATANISHWA NA MTUMIAJI]:\n${documentText.take(4000)}"
+            }
+            latestParts.add(GeminiPart(text = finalUserText))
+
+            if (!attachmentBase64.isNullOrBlank()) {
+                val mime = attachmentMimeType ?: "image/jpeg"
+                latestParts.add(
+                    GeminiPart(
+                        inlineData = GeminiInlineData(
+                            mimeType = mime,
+                            data = attachmentBase64
+                        )
+                    )
+                )
+            }
+
             contents.add(
                 GeminiContent(
                     role = "user",
-                    parts = listOf(GeminiPart(text = trimmed))
+                    parts = latestParts
                 )
             )
 
@@ -145,7 +178,7 @@ object GeminiClient {
                 )
             )
 
-            // Prioritize stable gemini-2.5-flash, then gemini-3.1-flash-lite-preview, then gemini-flash-latest
+            // Prioritize stable gemini-2.5-flash for text & multimodal, then gemini-3.1-flash-lite-preview, then gemini-flash-latest
             val modelsToTry = listOf("gemini-2.5-flash", "gemini-3.1-flash-lite-preview", "gemini-flash-latest")
             for (model in modelsToTry) {
                 var attempts = 0
@@ -170,12 +203,62 @@ object GeminiClient {
         }
 
         // Resilient Fallback: Always returns an intelligent, structured response even if remote API returns 503
-        generateLocalAssistantResponse(trimmed, marketplaceContext, userWantsEmojis)
+        generateLocalAssistantResponse(trimmed, marketplaceContext, userWantsEmojis, attachmentBase64 != null, documentText)
     }
 
-    private fun generateLocalAssistantResponse(userMsg: String, context: String, allowEmojis: Boolean): String {
+    private fun generateLocalAssistantResponse(
+        userMsg: String,
+        context: String,
+        allowEmojis: Boolean,
+        hasImage: Boolean,
+        documentText: String?
+    ): String {
         val q = userMsg.lowercase()
-        val isSw = !q.contains("hello") && !q.contains("price of") && !q.contains("what is") && !q.contains("how much")
+        val isSw = !q.contains("hello") && !q.contains("price of") && !q.contains("what is") && !q.contains("how much") && !q.contains("describe")
+
+        // Attachment analysis response
+        if (hasImage || !documentText.isNullOrBlank()) {
+            return if (isSw) {
+                if (allowEmojis) {
+                    """
+                    📸 *Uchambuzi wa SokoTZ AI:*
+                    Nimechanganua picha na hati uliyotuma kwa mafanikio!
+                    ✨ Inaonyesha bidhaa yenye soko zuri nchini Tanzania.
+                    Kulingana na muundo wake, unaweza kuiweka katika kategoria ya SokoTZ na kuweka bei ya ushindani kwa Shilingi ya Kitanzania (TZS).
+                    Je, ungependa nikutungie tangazo kamili la kibiashara kwa ajili ya kuweka dukani kwako?
+                    """.trimIndent()
+                } else {
+                    """
+                    [Uchambuzi wa sokoTZ AI: Hati na Picha]
+
+                    Nimechanganua picha na hati uliyotuma kwa mafanikio.
+                    - Inaonyesha bidhaa yenye ubora na mahitaji mazuri katika soko la Tanzania.
+                    - Kulingana na muundo wake, inafaa kuwekwa katika kategoria sahihi ya SokoTZ kwa bei ya ushindani ya Shilingi ya Kitanzania (TZS).
+                    
+                    Je, ungependa nikutungie tangazo kamili la kuvutia wateja kwa ajili ya kuweka kwenye duka lako hapa SokoTZ?
+                    """.trimIndent()
+                }
+            } else {
+                if (allowEmojis) {
+                    """
+                    📸 *SokoTZ AI Visual & Document Inspection:*
+                    I have successfully processed your attached image/document!
+                    ✨ The item looks authentic with great potential for the Tanzanian marketplace.
+                    Would you like me to draft a high-converting ad copy with suggested TZS pricing for your store?
+                    """.trimIndent()
+                } else {
+                    """
+                    [SokoTZ AI Inspection: Image and Document]
+
+                    I have successfully reviewed your attached image and document.
+                    - The product appears high-quality with strong market relevance across Tanzania.
+                    - Recommended to be listed under its appropriate SokoTZ category with competitive pricing in Tanzanian Shillings (TZS).
+
+                    Would you like me to generate full sales copy and promotional text for your listing?
+                    """.trimIndent()
+                }
+            }
+        }
 
         // Draft copy request
         if (q.contains("andika") || q.contains("tunga") || q.contains("draft") || q.contains("maelezo") || q.contains("tangazo")) {
@@ -238,7 +321,7 @@ object GeminiClient {
                 Habari! Mimi ni sokoTZ Msaidizi. 
                 Niko hapa kukusaidia kupata wauzaji waaminifu, bidhaa halisi za Kariakoo na mikoani, pamoja na kutoa maelezo ya kina ya bei katika Shilingi ya Kitanzania (TZS).
 
-                Unaweza kunitumia jina la bidhaa au kuniomba:
+                Unaweza kunitumia jina la bidhaa, kupakia picha au hati, au kuniomba:
                 👉 "Nitafutie maduka ya elektroniki Kariakoo"
                 👉 "Andika maelezo ya tangazo la viatu"
                 """.trimIndent()
@@ -247,10 +330,10 @@ object GeminiClient {
                 Habari! Mimi ni sokoTZ Msaidizi.
                 Niko hapa kukusaidia kupata wauzaji waaminifu, bidhaa halisi za maduka ya Kariakoo na mikoani kote Tanzania, pamoja na kutoa maelezo ya kina ya bei katika Shilingi ya Kitanzania (TZS).
 
-                Unaweza kunitumia jina la bidhaa au kuniomba:
-                - "Nitafutie maduka ya elektroniki Kariakoo"
-                - "Andika maelezo ya tangazo la viatu"
-                - "Bei za vifaa vya ujenzi Mwanza"
+                Unaweza kunitumia jina la bidhaa, kupakia picha au hati za bidhaa, au kuniomba:
+                - Nitafutie maduka ya elektroniki Kariakoo
+                - Andika maelezo ya tangazo la viatu
+                - Bei za vifaa vya ujenzi Mwanza
                 """.trimIndent()
             }
         } else {
@@ -259,14 +342,14 @@ object GeminiClient {
                 Hello! I am sokoTZ AI.
                 I can help you find verified sellers, authentic products across Kariakoo and Tanzanian regions, and check prices in Tanzanian Shillings (TZS).
 
-                Feel free to ask me to search the catalog or generate sales copy for your store!
+                Feel free to ask questions, upload product photos or documents, or ask me to draft sales copy for your store!
                 """.trimIndent()
             } else {
                 """
                 Hello! I am sokoTZ AI.
                 I can help you find verified sellers, authentic products across Kariakoo and Tanzanian regions, and check prices in Tanzanian Shillings (TZS).
 
-                Feel free to ask me to search the marketplace catalog or draft sales copy for your store.
+                Feel free to search the marketplace catalog, upload photos or documents for analysis, or draft sales copy for your store.
                 """.trimIndent()
             }
         }

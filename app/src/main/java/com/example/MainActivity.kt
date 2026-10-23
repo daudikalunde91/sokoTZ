@@ -13,6 +13,7 @@ import com.example.ui.theme.ThemeManager
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        com.example.sokotz.data.util.FirebaseInitHelper.ensureInitialized(this)
         ThemeManager.init(this)
         enableEdgeToEdge()
         setContent {

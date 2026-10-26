@@ -101,7 +101,7 @@ object SokoColors {
         @Composable get() = if (isDark) SokoCardBorder else Color(0xFFE2E8F0)
 
     val headerSurface: Color
-        @Composable get() = if (isDark) SokoMidnightBlue else Color(0xFF0F172A)
+        @Composable get() = if (isDark) SokoMidnightBlue else Color.White
 
     val navBarSurface: Color
         @Composable get() = if (isDark) SokoMidnightBlue else Color.White
@@ -110,10 +110,19 @@ object SokoColors {
         @Composable get() = if (isDark) SokoLightText else Color(0xFF0F172A)
 
     val textMuted: Color
-        @Composable get() = if (isDark) SokoMutedText else Color(0xFF64748B)
+        @Composable get() = if (isDark) SokoMutedText else Color(0xFF475569)
 
     val inputBackground: Color
         @Composable get() = if (isDark) SokoDeepNavy else Color(0xFFF1F5F9)
+
+    val accentPrimary: Color
+        @Composable get() = if (isDark) SokoNeonBlue else Color(0xFF0284C7)
+
+    val accentSecondary: Color
+        @Composable get() = if (isDark) SokoNeonViolet else Color(0xFF7C3AED)
+
+    val tagPillBackground: Color
+        @Composable get() = if (isDark) SokoMidnightBlue else Color(0xFFE0F2FE)
 
     val heroGradient: Brush
         @Composable get() = if (isDark) {

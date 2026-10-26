@@ -31,19 +31,24 @@ import java.util.UUID
 
 private fun provideFirestore(context: Context): FirebaseFirestore {
     com.example.sokotz.data.util.FirebaseInitHelper.ensureInitialized(context)
-    return FirebaseFirestore.getInstance(
-        context.applicationContext.getString(R.string.firestore_database_id)
-    )
+    val dbId = context.applicationContext.getString(R.string.firestore_database_id)
+    return try {
+        FirebaseFirestore.getInstance(com.google.firebase.FirebaseApp.getInstance(), dbId)
+    } catch (_: Exception) {
+        FirebaseFirestore.getInstance(dbId)
+    }
 }
 
 class FirestoreMarketplaceRepository(
     private val db: FirebaseFirestore,
-    private val auth: FirebaseAuth = Firebase.auth
+    private val auth: FirebaseAuth = Firebase.auth,
+    private val appContext: Context? = null
 ) {
 
     constructor(context: Context) : this(
         provideFirestore(context),
-        Firebase.auth
+        Firebase.auth,
+        context.applicationContext
     )
 
     private fun requireUserId(): String {
@@ -542,7 +547,8 @@ class FirestoreMarketplaceRepository(
         attachmentMimeType: String? = null,
         documentText: String? = null,
         attachmentName: String? = null,
-        attachmentUri: String? = null
+        attachmentUri: String? = null,
+        userWantsEmojis: Boolean = false
     ) {
         val trimmed = userText.trim()
         if (trimmed.isEmpty() && attachmentBase64 == null && documentText == null) return
@@ -588,7 +594,8 @@ class FirestoreMarketplaceRepository(
                     userName = currentUserName,
                     attachmentBase64 = attachmentBase64,
                     attachmentMimeType = attachmentMimeType,
-                    documentText = documentText
+                    documentText = documentText,
+                    userWantsEmojisExplicit = userWantsEmojis
                 )
 
                 val matchedListings = _listings.value.filter { listing ->
@@ -602,12 +609,34 @@ class FirestoreMarketplaceRepository(
                         trimmed.lowercase().contains("draft") ||
                         trimmed.lowercase().contains("maelezo")
 
+                val isPosterRequest = trimmed.contains("bango", ignoreCase = true) ||
+                        trimmed.contains("poster", ignoreCase = true)
+
+                var inlinePosterPath: String? = null
+                if (isPosterRequest && appContext != null) {
+                    val target = matchedListings.firstOrNull() ?: _listings.value.firstOrNull()
+                    if (target != null) {
+                        try {
+                            inlinePosterPath = GeminiClient.generateAiAdPosterImage(
+                                context = appContext,
+                                title = target.titleSw,
+                                priceTzs = target.priceTzs,
+                                businessName = target.businessName,
+                                city = target.city
+                            )
+                        } catch (e: Exception) {
+                            Log.e("FirestoreRepo", "Failed to generate inline ad poster", e)
+                        }
+                    }
+                }
+
                 val assistantMsg = AssistantMessage(
                     id = "asst_${UUID.randomUUID()}",
                     isUser = false,
                     text = aiResponse,
                     referencedListings = matchedListings,
-                    isAiDraft = isDraft
+                    isAiDraft = isDraft,
+                    generatedAdImageUrl = inlinePosterPath
                 )
 
                 val updated = _assistantMessages.value + assistantMsg
@@ -635,9 +664,16 @@ class FirestoreMarketplaceRepository(
     suspend fun generateAdPoster(
         context: Context,
         listing: Listing,
-        scope: CoroutineScope
+        scope: CoroutineScope,
+        theme: com.example.sokotz.data.util.PosterTheme = com.example.sokotz.data.util.PosterTheme.NAVY_CYAN
     ): String? {
-        val posterUri = com.example.sokotz.data.util.AdPosterGenerator.generatePoster(context, listing)
+        val posterUri = GeminiClient.generateAiAdPosterImage(
+            context = context,
+            title = listing.titleSw,
+            priceTzs = listing.priceTzs,
+            businessName = listing.businessName,
+            city = listing.city
+        ) ?: com.example.sokotz.data.util.AdPosterGenerator.generatePoster(context, listing, theme)
         if (posterUri != null) {
             val userPromptMsg = AssistantMessage(
                 id = "user_${UUID.randomUUID()}",
@@ -649,9 +685,9 @@ class FirestoreMarketplaceRepository(
                 id = "asst_${UUID.randomUUID()}",
                 isUser = false,
                 text = if (isSw)
-                    "[Bango Rasmi la Tangazo la SokoTZ]\nNimekutengenezea bango la tangazo lenye muonekano wa kuvutia kwa ajili ya bidhaa yako '${listing.titleSw}'. Unaweza kulihifadhi, kulishiriki kwenye WhatsApp Status, Instagram au Facebook!"
+                    "[Bango Rasmi la Tangazo la SokoTZ (sokoTZ AI)]\nNimekutengenezea bango la tangazo lenye muonekano wa kuvutia kwa ajili ya bidhaa yako '${listing.titleSw}'. Unaweza kulihifadhi kwenye simu yako au kulishiriki moja kwa moja kwenye WhatsApp Status, Instagram au Facebook!"
                 else
-                    "[Official SokoTZ Ad Poster]\nI have generated a professional promotional ad poster for '${listing.titleEn}'. You can save and share it across WhatsApp Status, Instagram, or Facebook!",
+                    "[Official SokoTZ Ad Poster (sokoTZ AI)]\nI have generated a professional promotional ad poster for '${listing.titleEn}'. You can save it to your phone or share it directly across WhatsApp Status, Instagram, or Facebook!",
                 generatedAdImageUrl = posterUri
             )
             val updated = _assistantMessages.value + userPromptMsg + aiPosterMsg
@@ -659,6 +695,51 @@ class FirestoreMarketplaceRepository(
             activeUserId?.let { uid -> userConversations[uid] = updated }
         }
         return posterUri
+    }
+
+    suspend fun generateCustomAdPoster(
+        context: Context,
+        title: String,
+        priceTzs: Long,
+        businessName: String,
+        city: String,
+        phoneNumber: String,
+        categoryName: String,
+        description: String = "",
+        theme: com.example.sokotz.data.util.PosterTheme = com.example.sokotz.data.util.PosterTheme.NAVY_CYAN
+    ): String? {
+        return try {
+            val bitmap = com.example.sokotz.data.util.AdPosterGenerator.generatePoster(
+                context = context,
+                title = title,
+                priceTzs = priceTzs,
+                businessName = businessName,
+                city = city,
+                phoneNumber = phoneNumber,
+                categoryName = categoryName,
+                description = description,
+                theme = theme
+            )
+            val file = com.example.sokotz.data.util.AdPosterGenerator.savePosterToCache(context, bitmap)
+            val path = file.absolutePath
+            val isSw = _language.value == AppLanguage.SW
+            val aiPosterMsg = AssistantMessage(
+                id = "asst_${UUID.randomUUID()}",
+                isUser = false,
+                text = if (isSw)
+                    "[Bango Maalum la Tangazo]\nBango lako la tangazo la '$title' limetengenezwa kwa ufanisi mkubwa! Unaweza kulihifadhi kwenye picha au kulishiriki kwenye WhatsApp Status na mitandao ya kijamii."
+                else
+                    "[Custom Ad Poster]\nYour custom ad poster for '$title' has been created successfully! You can save it to your gallery or share it to WhatsApp Status and social media.",
+                generatedAdImageUrl = path
+            )
+            val updated = _assistantMessages.value + aiPosterMsg
+            _assistantMessages.value = updated
+            activeUserId?.let { uid -> userConversations[uid] = updated }
+            path
+        } catch (e: Exception) {
+            Log.e("FirestoreRepo", "Failed to generate custom ad poster", e)
+            null
+        }
     }
 
     fun clearAssistantConversation() {

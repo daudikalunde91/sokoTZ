@@ -795,11 +795,12 @@ fun SignInScreen(
                 ) {
                     Text(
                         text = if (isSw)
-                            "Weka anwani yako ya barua pepe. Tutakutumia kiungo cha kubadilisha nenosiri lako kupitia mfumo rasmi wa Firebase."
+                            "Weka anwani yako ya barua pepe uliyojiandikisha nayo. Tutakutumia kiungo salama cha kubadilisha nenosiri.\n\nKumbuka: Ikiwa ulijiandikisha kwa 'Ingia kwa Google', hauhitaji nenosiri — unaweza kuingia moja kwa moja kwa kugusa kitufe cha Google."
                         else
-                            "Enter your email address. We will send you a password reset link via Firebase Authentication.",
-                        fontSize = 13.sp,
-                        color = SokoColors.textMuted
+                            "Enter the email address you registered with. We will send you a secure password reset link.\n\nNote: If you registered using 'Sign in with Google', you do not have a password — simply tap the Google button to sign in directly.",
+                        fontSize = 12.sp,
+                        color = SokoColors.textMuted,
+                        lineHeight = 17.sp
                     )
 
                     OutlinedTextField(
@@ -865,9 +866,9 @@ fun SignInScreen(
                             onSuccess = {
                                 isResetLoading = false
                                 resetStatusMessage = if (isSw)
-                                    "Kiungo cha kuweka upya nenosiri kimetumwa! Tafadhali fungua barua pepe yako."
+                                    "Kiungo cha kuweka upya nenosiri kimetumwa kwenye barua pepe yako! Tafadhali fungua Inbox yako, na hakikisha pia unakagua folda ya SPAM / JUNK iwapo hujaiona."
                                 else
-                                    "Password reset link sent! Please check your email inbox."
+                                    "Password reset link sent to your email! Please check your Inbox and make sure to also check your SPAM / JUNK folder if not found."
                             },
                             onError = { err ->
                                 isResetLoading = false

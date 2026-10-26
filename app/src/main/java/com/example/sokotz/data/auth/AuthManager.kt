@@ -63,7 +63,11 @@ class AuthManager(private val context: Context) {
     private fun getDb(): FirebaseFirestore {
         com.example.sokotz.data.util.FirebaseInitHelper.ensureInitialized(context)
         val dbId = context.getString(R.string.firestore_database_id)
-        return FirebaseFirestore.getInstance(dbId)
+        return try {
+            FirebaseFirestore.getInstance(com.google.firebase.FirebaseApp.getInstance(), dbId)
+        } catch (_: Exception) {
+            FirebaseFirestore.getInstance(dbId)
+        }
     }
 
     fun clearError() {
@@ -97,7 +101,11 @@ class AuthManager(private val context: Context) {
                 if (credential is CustomCredential && credential.type == TYPE_GOOGLE_ID_TOKEN_CREDENTIAL) {
                     val googleIdToken = GoogleIdTokenCredential.createFrom(credential.data).idToken
                     val authCredential = GoogleAuthProvider.getCredential(googleIdToken, null)
-                    auth.signInWithCredential(authCredential).await()
+                    val authResult = auth.signInWithCredential(authCredential).await()
+                    authResult.user?.let { user ->
+                        _currentUser.value = user
+                        loadOrCreateUserProfile(user)
+                    }
                 }
             } catch (e: Exception) {
                 // Auto sign-in is silent; proceed unauthenticated
@@ -130,7 +138,9 @@ class AuthManager(private val context: Context) {
                     val googleIdToken = GoogleIdTokenCredential.createFrom(credential.data).idToken
                     val authCredential = GoogleAuthProvider.getCredential(googleIdToken, null)
                     val authResult = auth.signInWithCredential(authCredential).await()
-                    authResult.user?.let { user ->
+                    val user = authResult.user
+                    if (user != null) {
+                        _currentUser.value = user
                         loadOrCreateUserProfile(user)
                     }
                 } else {
@@ -386,7 +396,9 @@ class AuthManager(private val context: Context) {
                 val existing = snapshot.toObject(UserProfile::class.java)
                 // If user registered with updated details, merge them
                 if (pendingDisplayName != null || pendingPhoneNumber != null || pendingAiPreferredName != null) {
-                    val updatedName = pendingDisplayName ?: existing?.displayName ?: user.displayName ?: "Mwanachama SokoTZ"
+                    val updatedName = (pendingDisplayName ?: existing?.displayName ?: user.displayName ?: "").trim().ifBlank {
+                        user.email?.substringBefore("@") ?: "Mwanachama SokoTZ"
+                    }
                     val updatedPhone = pendingPhoneNumber ?: existing?.phoneNumber ?: user.phoneNumber ?: ""
                     val updatedAiName = pendingAiPreferredName ?: existing?.aiPreferredName ?: ""
                     val updatedRole = pendingRole
@@ -398,7 +410,11 @@ class AuthManager(private val context: Context) {
                         "hasAcceptedTerms" to true,
                         "updatedAt" to FieldValue.serverTimestamp()
                     )
-                    docRef.update(updates)
+                    docRef.update(updates).addOnSuccessListener {
+                        Log.i("AuthManager", "User profile updated in Firestore: ${user.uid}")
+                    }.addOnFailureListener { e ->
+                        Log.e("AuthManager", "Failed to update profile: ${e.message}", e)
+                    }
                     _userProfile.value = existing?.copy(
                         displayName = updatedName,
                         phoneNumber = updatedPhone,
@@ -413,7 +429,9 @@ class AuthManager(private val context: Context) {
                     _userProfile.value = existing
                 }
             } else {
-                val displayName = pendingDisplayName ?: user.displayName ?: "Mwanachama SokoTZ"
+                val displayName = (pendingDisplayName ?: user.displayName ?: "").trim().ifBlank {
+                    user.email?.substringBefore("@") ?: "Mwanachama SokoTZ"
+                }
                 val phoneNumber = pendingPhoneNumber ?: user.phoneNumber ?: ""
                 val aiPreferred = pendingAiPreferredName ?: ""
                 val role = pendingRole
@@ -429,23 +447,41 @@ class AuthManager(private val context: Context) {
                     hasAcceptedTerms = pendingAcceptedTerms
                 )
                 docRef.set(newProfile)
+                    .addOnSuccessListener {
+                        Log.i("AuthManager", "User profile created in Firestore: ${user.uid}")
+                    }
+                    .addOnFailureListener { e ->
+                        Log.e("AuthManager", "Failed to set user profile in Firestore: ${e.message}", e)
+                    }
                 _userProfile.value = newProfile
                 pendingDisplayName = null
                 pendingPhoneNumber = null
                 pendingAiPreferredName = null
             }
         }.addOnFailureListener { e ->
-            Log.e("AuthManager", "Failed to fetch user profile", e)
-            _userProfile.value = UserProfile(
+            Log.e("AuthManager", "Failed to fetch user profile, creating new doc", e)
+            val displayName = (pendingDisplayName ?: user.displayName ?: "").trim().ifBlank {
+                user.email?.substringBefore("@") ?: "Mwanachama SokoTZ"
+            }
+            val newProfile = UserProfile(
                 id = user.uid,
                 userId = user.uid,
-                displayName = pendingDisplayName ?: user.displayName ?: "Mwanachama SokoTZ",
+                displayName = displayName,
                 email = user.email ?: "",
                 phoneNumber = pendingPhoneNumber ?: user.phoneNumber ?: "",
                 role = pendingRole,
+                photoUrl = user.photoUrl?.toString() ?: "",
                 aiPreferredName = pendingAiPreferredName ?: "",
                 hasAcceptedTerms = pendingAcceptedTerms
             )
+            docRef.set(newProfile)
+                .addOnSuccessListener {
+                    Log.i("AuthManager", "User profile created after fetch failure: ${user.uid}")
+                }
+                .addOnFailureListener { setErr ->
+                    Log.e("AuthManager", "Failed to write user profile after fetch failure: ${setErr.message}", setErr)
+                }
+            _userProfile.value = newProfile
         }
     }
 

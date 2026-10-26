@@ -23,9 +23,12 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material.icons.filled.NearMe
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Store
 import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
@@ -37,12 +40,16 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import coil.compose.AsyncImage
 import androidx.compose.ui.platform.LocalContext
+import com.example.sokotz.ui.components.MeetupLocationDialog
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -78,8 +85,10 @@ fun ListingDetailScreen(
     val context = LocalContext.current
     val language by repository.language.collectAsState()
     val isSw = language == AppLanguage.SW
+    var showMeetupLocationDialog by remember { mutableStateOf(false) }
 
-    val listing = repository.getListingById(listingId)
+    val listings by repository.listings.collectAsState()
+    val listing = listings.find { it.id == listingId } ?: repository.getListingById(listingId)
 
     LaunchedEffect(listing?.id) {
         listing?.id?.let { id ->
@@ -352,14 +361,40 @@ fun ListingDetailScreen(
             Spacer(modifier = Modifier.height(24.dp))
         }
 
-        // Fixed Bottom Contact Bar
+        // Fixed Bottom Contact & Meetup Bar
         Surface(
             color = SokoColors.headerSurface,
             modifier = Modifier
                 .fillMaxWidth()
                 .border(1.dp, SokoColors.cardBorder, RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp))
         ) {
-            Box(modifier = Modifier.padding(16.dp)) {
+            Column(modifier = Modifier.padding(14.dp)) {
+                Button(
+                    onClick = { showMeetupLocationDialog = true },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(44.dp)
+                        .testTag("meetup_location_button"),
+                    colors = ButtonDefaults.buttonColors(containerColor = SokoNeonBlue),
+                    shape = RoundedCornerShape(10.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.NearMe,
+                        contentDescription = null,
+                        tint = SokoBlueBlack,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = if (isSw) "Kutana na Muuzaji (Shiriki Eneo Lako / Live Pin)" else "Meet Up (Share Live Location)",
+                        color = SokoBlueBlack,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 13.sp
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(10.dp))
+
                 ContactActionRow(
                     phoneNumber = listing.phoneNumber,
                     whatsappNumber = listing.whatsappNumber,
@@ -367,5 +402,13 @@ fun ListingDetailScreen(
                 )
             }
         }
+    }
+
+    if (showMeetupLocationDialog) {
+        MeetupLocationDialog(
+            listing = listing,
+            isSw = isSw,
+            onDismiss = { showMeetupLocationDialog = false }
+        )
     }
 }

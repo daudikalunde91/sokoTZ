@@ -414,14 +414,40 @@ fun BusinessHubScreen(
                                 style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
                                 color = SokoColors.textPrimary
                             )
-                            Button(
-                                onClick = { currentTab = 1 },
-                                colors = ButtonDefaults.buttonColors(containerColor = SokoNeonBlue),
-                                shape = RoundedCornerShape(8.dp)
-                            ) {
-                                Icon(Icons.Default.Add, contentDescription = "Add", tint = SokoBlueBlack, modifier = Modifier.size(16.dp))
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text(if (isSw) "Ongeza" else "Add New", color = SokoBlueBlack, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Button(
+                                    onClick = {
+                                        scope.launch {
+                                            val top = businessListings.firstOrNull()
+                                            if (top != null) {
+                                                Toast.makeText(context, if (isSw) "sokoTZ AI inatengeneza bango..." else "sokoTZ AI is generating poster...", Toast.LENGTH_SHORT).show()
+                                                repository.generateAdPoster(context, top, scope)
+                                                onNavigateToAssistant()
+                                            } else {
+                                                repository.sendAssistantMessage(
+                                                    userText = if (isSw) "Tafadhali nitengenezee bango zuri la tangazo la biashara yangu ya sokoTZ" else "Please generate an attractive ad poster for my sokoTZ business",
+                                                    scope = scope
+                                                )
+                                                onNavigateToAssistant()
+                                            }
+                                        }
+                                    },
+                                    colors = ButtonDefaults.buttonColors(containerColor = SokoNeonViolet),
+                                    shape = RoundedCornerShape(8.dp)
+                                ) {
+                                    Icon(Icons.Default.AutoAwesome, contentDescription = "AI Poster", tint = SokoLightText, modifier = Modifier.size(16.dp))
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text(if (isSw) "Bango (sokoTZ AI)" else "AI Poster", color = SokoLightText, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                                }
+                                Button(
+                                    onClick = { currentTab = 1 },
+                                    colors = ButtonDefaults.buttonColors(containerColor = SokoNeonBlue),
+                                    shape = RoundedCornerShape(8.dp)
+                                ) {
+                                    Icon(Icons.Default.Add, contentDescription = "Add", tint = SokoBlueBlack, modifier = Modifier.size(16.dp))
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text(if (isSw) "Ongeza" else "Add New", color = SokoBlueBlack, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                                }
                             }
                         }
                     }
@@ -530,11 +556,9 @@ fun BusinessHubScreen(
                                 Button(
                                     onClick = {
                                         scope.launch {
-                                            val posterUri = repository.generateAdPoster(context, listing, scope)
-                                            if (posterUri != null) {
-                                                Toast.makeText(context, if (isSw) "Bango limezalishwa! Fungua sokoTZ Msaidizi kuliona." else "Ad poster generated! Check sokoTZ AI chat.", Toast.LENGTH_SHORT).show()
-                                                onNavigateToAssistant()
-                                            }
+                                            Toast.makeText(context, if (isSw) "sokoTZ AI inatengeneza bango..." else "sokoTZ AI is generating poster...", Toast.LENGTH_SHORT).show()
+                                            repository.generateAdPoster(context, listing, scope)
+                                            onNavigateToAssistant()
                                         }
                                     },
                                     shape = RoundedCornerShape(8.dp),
@@ -545,7 +569,7 @@ fun BusinessHubScreen(
                                     Icon(Icons.Default.AutoAwesome, contentDescription = null, tint = SokoBlueBlack, modifier = Modifier.size(16.dp))
                                     Spacer(modifier = Modifier.width(6.dp))
                                     Text(
-                                        text = if (isSw) "Tengeneza Bango la Tangazo (Ad Poster)" else "Generate Ad Poster",
+                                        text = if (isSw) "Tengeneza Bango la Tangazo (sokoTZ AI)" else "Generate Ad Poster (sokoTZ AI)",
                                         color = SokoBlueBlack,
                                         style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold)
                                     )
@@ -903,7 +927,7 @@ fun BusinessHubScreen(
                             isPublishing = true
                             scope.launch {
                                 val result = repository.createListing(
-                                    businessId = userBusiness?.id ?: "biz_direct_${currentUser?.uid ?: "user"}",
+                                    businessId = userBusiness?.id ?: (currentUser?.uid ?: "user"),
                                     businessName = userBusiness?.name ?: (currentUser?.displayName ?: "Muuzaji SokoTZ"),
                                     title = listingTitle,
                                     priceTzs = priceLong,

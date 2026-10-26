@@ -1,7 +1,10 @@
 package com.example.sokotz.data.remote
 
+import android.content.Context
 import android.util.Log
 import com.example.BuildConfig
+import com.example.sokotz.data.util.AdPosterGenerator
+import com.example.sokotz.data.util.PosterTheme
 import com.squareup.moshi.JsonClass
 import com.squareup.moshi.Moshi
 import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
@@ -14,6 +17,10 @@ import retrofit2.http.Body
 import retrofit2.http.POST
 import retrofit2.http.Path
 import retrofit2.http.Query
+import java.io.File
+import java.io.FileOutputStream
+import java.text.NumberFormat
+import java.util.Locale
 import java.util.concurrent.TimeUnit
 
 @JsonClass(generateAdapter = true)
@@ -35,9 +42,23 @@ data class GeminiContent(
 )
 
 @JsonClass(generateAdapter = true)
+data class GeminiImageConfig(
+    val aspectRatio: String? = "1:1",
+    val imageSize: String? = "1K"
+)
+
+@JsonClass(generateAdapter = true)
+data class GeminiGenerationConfig(
+    val responseModalities: List<String>? = null,
+    val imageConfig: GeminiImageConfig? = null,
+    val temperature: Float? = null
+)
+
+@JsonClass(generateAdapter = true)
 data class GeminiRequest(
     val contents: List<GeminiContent>,
-    val systemInstruction: GeminiContent? = null
+    val systemInstruction: GeminiContent? = null,
+    val generationConfig: GeminiGenerationConfig? = null
 )
 
 @JsonClass(generateAdapter = true)
@@ -88,7 +109,8 @@ object GeminiClient {
         userName: String = "",
         attachmentBase64: String? = null,
         attachmentMimeType: String? = null,
-        documentText: String? = null
+        documentText: String? = null,
+        userWantsEmojisExplicit: Boolean = false
     ): String = withContext(Dispatchers.IO) {
         val apiKey = BuildConfig.GEMINI_API_KEY
         val trimmed = userMessage.trim()
@@ -99,7 +121,7 @@ object GeminiClient {
             ""
         }
 
-        val userWantsEmojis = userMessage.any { char ->
+        val userWantsEmojis = userWantsEmojisExplicit || userMessage.any { char ->
             val type = Character.getType(char)
             type == Character.SURROGATE.toInt() || type == Character.OTHER_SYMBOL.toInt()
         } || userMessage.contains("weka emoji", ignoreCase = true) ||
@@ -352,6 +374,88 @@ object GeminiClient {
                 Feel free to search the marketplace catalog, upload photos or documents for analysis, or draft sales copy for your store.
                 """.trimIndent()
             }
+        }
+    }
+
+    /**
+     * Autonomously generates a visual advertising poster image using Gemini 2.5 Flash Image model.
+     * If offline or API key is not present, falls back gracefully to high-res local canvas rendering.
+     */
+    suspend fun generateAiAdPosterImage(
+        context: Context,
+        title: String,
+        priceTzs: Long,
+        businessName: String,
+        city: String
+    ): String? = withContext(Dispatchers.IO) {
+        val apiKey = BuildConfig.GEMINI_API_KEY
+        val formattedPrice = NumberFormat.getNumberInstance(Locale.US).format(priceTzs)
+
+        val prompt = "Create a stunning, high-resolution commercial advertisement poster banner for an e-commerce product in Tanzania. " +
+                "Product: '$title'. Store: '$businessName' in $city, Tanzania. Price: TZS $formattedPrice. " +
+                "Style: Vibrant, modern retail marketing poster, clean composition, crisp product display, eye-catching Tanzanian market commercial design, 1:1 aspect ratio."
+
+        if (apiKey.isNotBlank() && apiKey != "MY_GEMINI_API_KEY" && apiKey != "your_api_key_here") {
+            try {
+                val request = GeminiRequest(
+                    contents = listOf(
+                        GeminiContent(
+                            parts = listOf(GeminiPart(text = prompt))
+                        )
+                    ),
+                    generationConfig = GeminiGenerationConfig(
+                        responseModalities = listOf("TEXT", "IMAGE"),
+                        imageConfig = GeminiImageConfig(aspectRatio = "1:1", imageSize = "1K")
+                    )
+                )
+
+                val response = api.generateContent(
+                    model = "gemini-2.5-flash-image",
+                    apiKey = apiKey,
+                    request = request
+                )
+
+                val inlinePart = response.candidates
+                    ?.firstOrNull()
+                    ?.content
+                    ?.parts
+                    ?.firstOrNull { it.inlineData != null && !it.inlineData.data.isNullOrBlank() }
+                    ?.inlineData
+
+                if (inlinePart != null) {
+                    val bytes = android.util.Base64.decode(inlinePart.data, android.util.Base64.DEFAULT)
+                    val ext = if (inlinePart.mimeType.contains("png")) "png" else "jpg"
+                    val file = File(context.cacheDir, "ai_poster_${System.currentTimeMillis()}.$ext")
+                    FileOutputStream(file).use { fos ->
+                        fos.write(bytes)
+                        fos.flush()
+                    }
+                    Log.d("GeminiClient", "AI generated poster saved at: ${file.absolutePath}")
+                    return@withContext "file://${file.absolutePath}"
+                }
+            } catch (e: Exception) {
+                Log.w("GeminiClient", "AI image generation via gemini-2.5-flash-image failed: ${e.message}, falling back to local visual generator", e)
+            }
+        }
+
+        // Resilient fallback to local high-resolution canvas poster generator
+        try {
+            val bitmap = AdPosterGenerator.generatePoster(
+                context = context,
+                title = title,
+                priceTzs = priceTzs,
+                businessName = businessName,
+                city = city,
+                phoneNumber = "+255",
+                categoryName = "SokoTZ",
+                description = "Ofa maalum kwenye sokoTZ Tanzania!",
+                theme = PosterTheme.NAVY_CYAN
+            )
+            val file = AdPosterGenerator.savePosterToCache(context, bitmap, "sokotz_poster_${System.currentTimeMillis()}.jpg")
+            return@withContext file.absolutePath
+        } catch (e: Exception) {
+            Log.e("GeminiClient", "Fallback poster generation failed: ${e.message}", e)
+            return@withContext null
         }
     }
 }

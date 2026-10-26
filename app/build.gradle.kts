@@ -16,7 +16,7 @@ android {
   defaultConfig {
     applicationId = "com.aistudio.sokotz.kzqm"
     minSdk = 24
-    targetSdk = 36
+    targetSdk = 35
     versionCode = 1
     versionName = "1.0"
 
@@ -68,6 +68,11 @@ android {
   dependenciesInfo {
     includeInApk = false
     includeInBundle = true
+  }
+  packaging {
+    jniLibs {
+      useLegacyPackaging = true
+    }
   }
 }
 

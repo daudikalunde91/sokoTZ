@@ -123,7 +123,7 @@ fun SokoTzHeader(
                     Text(
                         text = if (currentLanguage == AppLanguage.SW) "Soko Lako la Kidijitali" else "Tanzania Marketplace",
                         style = MaterialTheme.typography.bodySmall,
-                        color = SokoNeonBlue
+                        color = SokoColors.accentPrimary
                     )
                 }
             }

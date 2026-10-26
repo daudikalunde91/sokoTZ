@@ -16,8 +16,9 @@ service cloud.firestore {
     }
 
     function isBusinessOwner(bizId) {
-      return exists(/databases/$(database)/documents/businesses/$(bizId)) &&
-             get(/databases/$(database)/documents/businesses/$(bizId)).data.ownerId == request.auth.uid;
+      return (bizId == request.auth.uid) ||
+             (!exists(/databases/$(database)/documents/businesses/$(bizId))) ||
+             (get(/databases/$(database)/documents/businesses/$(bizId)).data.ownerId == request.auth.uid);
     }
 
     function isValidUser(data) {
@@ -103,7 +104,7 @@ service cloud.firestore {
       allow create: if isSignedIn() &&
                     incoming().ownerId == request.auth.uid &&
                     (!('isVerified' in incoming()) || incoming().isVerified == false) &&
-                    (!('rating' in incoming()) || incoming().rating == 0 || incoming().rating == 0.0) &&
+                    (!('rating' in incoming()) || incoming().rating == 0 || incoming().rating == 0.0 || incoming().rating == 5 || incoming().rating == 5.0) &&
                     (!('reviewCount' in incoming()) || incoming().reviewCount == 0) &&
                     isValidBusiness(incoming());
       allow update: if isSignedIn() &&

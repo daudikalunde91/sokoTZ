@@ -17,6 +17,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -42,12 +43,14 @@ import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Description
+import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import com.example.ui.theme.SokoSuccess
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -70,6 +73,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -99,6 +103,7 @@ import com.google.firebase.auth.FirebaseUser
 import kotlinx.coroutines.launch
 import java.io.File
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun AssistantScreen(
     repository: FirestoreMarketplaceRepository,
@@ -115,6 +120,7 @@ fun AssistantScreen(
     val isSw = language == AppLanguage.SW
 
     var inputText by remember { mutableStateOf("") }
+    var allowEmojis by remember { mutableStateOf(false) } // Default: only text
     var currentAttachment by remember { mutableStateOf<ParsedAttachment?>(null) }
     var attachedUriString by remember { mutableStateOf<String?>(null) }
     val listState = rememberLazyListState()
@@ -259,6 +265,55 @@ fun AssistantScreen(
             }
         }
 
+        // Response format toggle: Default is only text, option to switch to emojis
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(SokoColors.surface)
+                .padding(horizontal = 16.dp, vertical = 6.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = if (isSw) "Muundo wa Majibu:" else "Response Format:",
+                style = MaterialTheme.typography.labelSmall,
+                color = SokoColors.textMuted
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(if (!allowEmojis) (if (SokoColors.isDark) SokoMidnightBlue else Color(0xFFE0F2FE)) else SokoColors.cardSurface)
+                        .border(1.dp, if (!allowEmojis) SokoNeonBlue else SokoColors.cardBorder, RoundedCornerShape(16.dp))
+                        .clickable { allowEmojis = false }
+                        .padding(horizontal = 10.dp, vertical = 4.dp)
+                        .testTag("format_only_text_chip")
+                ) {
+                    Text(
+                        text = if (isSw) "Maandishi Tu (Chaguo-msingi)" else "Only Text (Default)",
+                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = if (!allowEmojis) FontWeight.Bold else FontWeight.Normal),
+                        color = if (!allowEmojis) SokoNeonBlue else SokoColors.textMuted
+                    )
+                }
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(if (allowEmojis) (if (SokoColors.isDark) SokoDeepPurple else Color(0xFFEDE9FE)) else SokoColors.cardSurface)
+                        .border(1.dp, if (allowEmojis) SokoNeonViolet else SokoColors.cardBorder, RoundedCornerShape(16.dp))
+                        .clickable { allowEmojis = true }
+                        .padding(horizontal = 10.dp, vertical = 4.dp)
+                        .testTag("format_emoji_chip")
+                ) {
+                    Text(
+                        text = if (isSw) "Na Emoji" else "With Emoji",
+                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = if (allowEmojis) FontWeight.Bold else FontWeight.Normal),
+                        color = if (allowEmojis) SokoNeonViolet else SokoColors.textMuted
+                    )
+                }
+            }
+        }
+        HorizontalDivider(color = SokoColors.cardBorder, thickness = 1.dp)
+
         // Messages list
         LazyColumn(
             state = listState,
@@ -282,8 +337,21 @@ fun AssistantScreen(
                 )
             }
 
-            // Assistant Thinking Indicator
+            // Assistant Thinking Indicator (Swahili: (inafikiria...), English: (thinking...))
             if (isThinking) {
+                val lastUserMessage = messages.lastOrNull { it.isUser }?.text?.lowercase().orEmpty()
+                val isEnglishUserPrompt = run {
+                    if (lastUserMessage.isBlank()) !isSw
+                    else {
+                        val englishWords = setOf("the", "what", "how", "where", "can", "is", "find", "price", "looking", "write", "generate", "create", "help", "who", "when", "why", "tell", "explain", "ad", "poster", "product", "business", "hello", "hi")
+                        val swahiliWords = setOf("habari", "jinsi", "natafuta", "bei", "mchele", "duka", "biashara", "kazi", "wapi", "kwa", "nini", "nani", "andika", "tunga", "maelezo", "tangazo", "mteja", "soko", "gani", "yangu", "yako")
+                        val enMatches = lastUserMessage.split(" ", "?", "!", ".", ",").count { it in englishWords }
+                        val swMatches = lastUserMessage.split(" ", "?", "!", ".", ",").count { it in swahiliWords }
+                        if (enMatches > swMatches) true
+                        else if (swMatches > enMatches) false
+                        else !isSw
+                    }
+                }
                 item {
                     Row(
                         modifier = Modifier
@@ -298,7 +366,7 @@ fun AssistantScreen(
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
-                            text = if (isSw) "sokoTZ Msaidizi (inafikiria...)" else "sokoTZ AI (thinking...)",
+                            text = if (isEnglishUserPrompt) "sokoTZ AI (thinking...)" else "sokoTZ Msaidizi (inafikiria...)",
                             style = MaterialTheme.typography.bodyMedium.copy(fontStyle = androidx.compose.ui.text.font.FontStyle.Italic),
                             color = SokoNeonViolet,
                             fontWeight = FontWeight.SemiBold
@@ -326,14 +394,18 @@ fun AssistantScreen(
                                 .background(SokoColors.cardSurface)
                                 .border(1.dp, SokoNeonBlue.copy(alpha = 0.6f), RoundedCornerShape(10.dp))
                                 .clickable {
-                                    val listings = repository.listings.value
-                                    val targetListing = listings.firstOrNull { repository.isOwnerOfListing(it.id) } ?: listings.firstOrNull()
+                                    val userListings = repository.listings.value.filter { repository.isOwnerOfListing(it.id) }
+                                    val targetListing = userListings.firstOrNull() ?: repository.listings.value.firstOrNull()
                                     if (targetListing != null) {
                                         scope.launch {
                                             repository.generateAdPoster(context, targetListing, scope)
                                         }
                                     } else {
-                                        repository.sendAssistantMessage("Nisaidie kutengeneza bango la tangazo (Ad poster) kwa ajili ya bidhaa yangu.", scope)
+                                        repository.sendAssistantMessage(
+                                            userText = if (isSw) "sokoTZ AI, nisaidie kutengeneza bango rasmi la tangazo lenye picha ya bidhaa yangu." else "sokoTZ AI, please generate an official advertising poster image for my product.",
+                                            scope = scope,
+                                            userWantsEmojis = allowEmojis
+                                        )
                                     }
                                 }
                                 .padding(horizontal = 12.dp, vertical = 10.dp)
@@ -366,7 +438,11 @@ fun AssistantScreen(
                                     .background(SokoColors.cardSurface)
                                     .border(1.dp, SokoColors.cardBorder, RoundedCornerShape(10.dp))
                                     .clickable {
-                                        repository.sendAssistantMessage(question, scope)
+                                        repository.sendAssistantMessage(
+                                            userText = question,
+                                            scope = scope,
+                                            userWantsEmojis = allowEmojis
+                                        )
                                     }
                                     .padding(horizontal = 12.dp, vertical = 10.dp)
                                     .testTag("suggested_prompt_chip")
@@ -578,7 +654,8 @@ fun AssistantScreen(
                                     attachmentMimeType = attachment?.mimeType,
                                     documentText = attachment?.extractedText,
                                     attachmentName = attachment?.name,
-                                    attachmentUri = uriString
+                                    attachmentUri = uriString,
+                                    userWantsEmojis = allowEmojis
                                 )
                             }
                         },
@@ -610,6 +687,7 @@ fun MessageBubble(
 ) {
     val context = LocalContext.current
     val isUser = message.isUser
+    val isSw = language == AppLanguage.SW
     Column(
         modifier = Modifier.fillMaxWidth(),
         horizontalAlignment = if (isUser) Alignment.End else Alignment.Start
@@ -702,7 +780,7 @@ fun MessageBubble(
                 if (!message.generatedAdImageUrl.isNullOrBlank()) {
                     Spacer(modifier = Modifier.height(12.dp))
                     AsyncImage(
-                        model = File(message.generatedAdImageUrl),
+                        model = File(message.generatedAdImageUrl.removePrefix("file://")),
                         contentDescription = "Generated SokoTZ Ad Poster",
                         modifier = Modifier
                             .fillMaxWidth()
@@ -713,13 +791,52 @@ fun MessageBubble(
                     )
                     Spacer(modifier = Modifier.height(8.dp))
                     Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(SokoNeonBlue)
-                            .clickable {
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        // Save Button
+                        Button(
+                            onClick = {
                                 try {
-                                    val posterFile = File(message.generatedAdImageUrl)
+                                    val cleanPath = message.generatedAdImageUrl.removePrefix("file://")
+                                    val posterFile = File(cleanPath)
+                                    val bmp = android.graphics.BitmapFactory.decodeFile(posterFile.absolutePath)
+                                    if (bmp != null) {
+                                        val uri = com.example.sokotz.data.util.AdPosterGenerator.savePosterToGallery(context, bmp)
+                                        if (uri != null) {
+                                            Toast.makeText(context, if (isSw) "Bango limehifadhiwa kwenye picha za simu yako!" else "Poster saved to gallery!", Toast.LENGTH_SHORT).show()
+                                        } else {
+                                            Toast.makeText(context, if (isSw) "Imeshindikana kuhifadhi" else "Save failed", Toast.LENGTH_SHORT).show()
+                                        }
+                                    }
+                                } catch (e: Exception) {
+                                    Toast.makeText(context, "Hitilafu: ${e.message}", Toast.LENGTH_SHORT).show()
+                                }
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = SokoSuccess),
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier.weight(1f).height(38.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Download,
+                                contentDescription = "Save Poster",
+                                tint = SokoBlueBlack,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = if (language == AppLanguage.SW) "Hifadhi (Gallery)" else "Save",
+                                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                                color = SokoBlueBlack
+                            )
+                        }
+
+                        // Share Button
+                        Button(
+                            onClick = {
+                                try {
+                                    val cleanPath = message.generatedAdImageUrl.removePrefix("file://")
+                                    val posterFile = File(cleanPath)
                                     val contentUri = FileProvider.getUriForFile(
                                         context,
                                         "${context.packageName}.fileprovider",
@@ -731,27 +848,28 @@ fun MessageBubble(
                                         putExtra(Intent.EXTRA_TEXT, "Bango langu jipya kwenye SokoTZ! Nunua na uuze kwa uhakika.")
                                         addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                                     }
-                                    context.startActivity(Intent.createChooser(shareIntent, "Shiriki Bango la Tangazo"))
+                                    context.startActivity(Intent.createChooser(shareIntent, if (isSw) "Shiriki Bango la Tangazo" else "Share Ad Poster"))
                                 } catch (e: Exception) {
                                     Toast.makeText(context, "Hifadhi ya picha ipo kwenye kifaa chako.", Toast.LENGTH_SHORT).show()
                                 }
-                            }
-                            .padding(vertical = 8.dp),
-                        horizontalArrangement = Arrangement.Center,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Share,
-                            contentDescription = "Share Poster",
-                            tint = SokoBlueBlack,
-                            modifier = Modifier.size(16.dp)
-                        )
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text(
-                            text = if (language == AppLanguage.SW) "Shiriki Bango (WhatsApp / Status)" else "Share Ad Poster",
-                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                            color = SokoBlueBlack
-                        )
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = SokoNeonBlue),
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier.weight(1f).height(38.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Share,
+                                contentDescription = "Share Poster",
+                                tint = SokoBlueBlack,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = if (language == AppLanguage.SW) "Shiriki (WhatsApp)" else "Share",
+                                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                                color = SokoBlueBlack
+                            )
+                        }
                     }
                 }
 

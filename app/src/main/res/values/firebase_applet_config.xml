@@ -1,5 +1,11 @@
 <?xml version="1.0" encoding="utf-8" standalone="no"?>
 <resources>
-    <string name="firestore_database_id" translatable="false">ai-studio-android-sokotz-17bca192-1896-4b7e-b183-ea8b41319929</string>
-    <string name="default_web_client_id" translatable="false">sokotz-dummy-client-id.apps.googleusercontent.com</string>
+    <string name="firestore_database_id" translatable="false">ai-studio-android-sokotz-d5a575ab-0477-4160-b139-0caa7e2d8a9a</string>
+    <string name="default_web_client_id" translatable="false">276149702266-1o7h30mlr7fepgov9q0pbgpep8vip0kp.apps.googleusercontent.com</string>
+    <string name="google_api_key" translatable="false">AIzaSyCEInTQ9_HJyUP48FMUij6SJ5gs3-kWleQ</string>
+    <string name="google_app_id" translatable="false">1:276149702266:android:1ec17871656bfa5e2875c3</string>
+    <string name="project_id" translatable="false">gen-lang-client-0905574889</string>
+    <string name="gcm_defaultSenderId" translatable="false">276149702266</string>
+    <string name="firebase_database_url" translatable="false">https://gen-lang-client-0905574889.firebaseio.com</string>
+    <string name="google_storage_bucket" translatable="false">gen-lang-client-0905574889.firebasestorage.app</string>
 </resources>

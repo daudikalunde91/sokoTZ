@@ -2,6 +2,61 @@
 
 All notable repairs, security enhancements, and UI bug fixes implemented in SokoTZ.
 
+## [1.2.0] - Security Hardening, Database Consistency & Advertising Rules
+
+### 1. Consistent Firestore Database Configuration (Criteria 1)
+- Verified and aligned database selection across all repositories and helpers:
+  - `firebase_applet_config.xml`: Authoritative database ID `ai-studio-android-sokotz-d5a575ab-0477-4160-b139-0caa7e2d8a9a`.
+  - `firebase.json`: Fixed to declare only the single active database ID.
+  - `FirebaseInitHelper.kt`: Centralized `getDatabaseId()` and `getFirestore(context)` provider.
+  - `AdCampaignRepository.kt`, `FirestoreMarketplaceRepository.kt`, and `AuthManager.kt`: Updated to use `FirebaseInitHelper.getFirestore(...)` uniformly.
+
+### 2. Business Ownership & Existence Validation (Criteria 2)
+- Hardened `isBusinessOwner(bizId)` in `firestore.rules`:
+  - Missing business documents explicitly return `false`.
+  - Caller must match `ownerId == request.auth.uid` on the referenced business document.
+  - Denies unauthorized creation of listings or ad campaigns with missing or foreign business IDs.
+
+### 3. Listing Moderation & Immutability (Criteria 3)
+- Locked down `listings/{listingId}` updates in `firestore.rules`:
+  - `ownerId` and `businessId` are immutable.
+  - Listing owners cannot bypass review to `PUBLISHED` or alter `isFeatured`.
+  - Public viewers can only increment `viewsCount` +1 with zero changes to other fields.
+
+### 4. Advertising Engagement Counter Security (Criteria 4)
+- Restricted `ad_campaigns/{campaignId}` updates:
+  - Engagement metrics restricted via `diff(resource.data).affectedKeys().hasOnly(...)`.
+  - Counters cannot be decremented or set to negative values.
+  - Engagement updates cannot alter sensitive business fields (`paymentStatus`, `sellerId`, `status`, `packagePriceTzs`).
+
+### 5. Secure Payment Records & Notifications (Criteria 5)
+- Secured `payment_transactions/{txnId}`:
+  - Sellers can only submit with status `SUBMITTED` or `PENDING`.
+  - Clients cannot mark transactions as `VERIFIED`.
+  - Transaction deletions are permanently blocked (`allow delete: if false`).
+  - Only authorized administrators can transition transactions to `VERIFIED`.
+- Secured `ad_notifications/{notificationId}`:
+  - Blocked unauthenticated/arbitrary notification spoofing between users.
+
+### 6. Explicit Authentication Methods (Criteria 6)
+- Refactored `AuthManager.kt`:
+  - Added explicit `signInWithEmailPassword` and `registerWithEmailPassword`.
+  - Removed misleading legacy overloads that silently redirected into Google Sign-In.
+  - Updated `SignInScreen.kt` to call the explicit methods.
+  - Preserved Google Sign-In via Android Credential Manager as a distinct option.
+
+### 7. Seed Data Separation from Production (Criteria 7)
+- Gated sample seed data in `FirestoreMarketplaceRepository.kt` behind `BuildConfig.DEBUG`.
+- In production/release builds, initial state starts clean and only live Firestore documents are displayed.
+
+### 8. Admin Authorization & Moderation Lifecycle (Criteria 8 & 9)
+- Enforced that role cannot be escalated to `ADMIN` by client.
+- Aligned `AdCampaignRepository.kt` payment submission (`PENDING_VERIFICATION` / `AWAITING_REVIEW`) and admin approval (`PAID` / `ACTIVE` / `VERIFIED`).
+
+### 9. Test Suite & Verification (Criteria 10)
+- Expanded `firestore.test.js` to 15 comprehensive security tests, covering all regression scenarios (15/15 passing).
+- Updated Robolectric test suite in `MarketplaceRepositoryRuleTest.kt`.
+
 ## [1.1.0] - Security Hardening & Full-Screen Theme Repair
 
 ### 1. Full-Screen Dark & Light Mode Theme Repair

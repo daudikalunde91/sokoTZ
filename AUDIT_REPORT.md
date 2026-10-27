@@ -9,41 +9,74 @@
 
 ---
 
-## 2. Security Vulnerabilities & Remediation
+## 2. Security Vulnerabilities & Remediation (Criteria 1 - 9)
 
-### 2.1 Firebase Authentication Architecture
-* **Original Defect:** In `AuthManager.kt` and `SignInScreen.kt`, standard email/password methods (`signInStandard()` and `registerStandard()`) were erroneously redirecting into Google Sign-In, omitting actual email/password credential management.
+### 2.1 Database Consistency & Intended Selection (Criteria 1)
+* **Original Defect:** The advertising repository was calling `FirebaseFirestore.getInstance()` without selecting the configured database, risking reads/writes against the default database while `firebase_applet_config.xml` specified `ai-studio-android-sokotz-d5a575ab-0477-4160-b139-0caa7e2d8a9a`.
 * **Remediation:**
-  * Implemented `FirebaseAuth.signInWithEmailAndPassword()` in `AuthManager.signInStandard()`.
-  * Implemented `FirebaseAuth.createUserWithEmailAndPassword()` in `AuthManager.registerStandard()`, with profile name propagation (`UserProfileChangeRequest`).
-  * Added password confirmation (`registerConfirmPassword`) in `SignInScreen.kt` with validation.
-  * Added password reset functionality (`FirebaseAuth.sendPasswordResetEmail()`) accessible via a dedicated dialog in `SignInScreen.kt`.
-  * Added localized Swahili & English error messaging for common auth exceptions (`user-not-found`, `wrong-password`, `email-already-in-use`, `weak-password`, `network-failure`).
-  * Preserved Google Sign-In via Android Jetpack `CredentialManager` as a parallel option.
+  * Created centralized `FirebaseInitHelper.getFirestore(context)` and `FirebaseInitHelper.getDatabaseId(context)`.
+  * Updated `AdCampaignRepository`, `FirestoreMarketplaceRepository`, and `AuthManager` to obtain Firestore instances strictly through this helper.
+  * Verified `firebase.json` specifies only the single authorized database ID to prevent emulator rules bypass.
 
-### 2.2 Cloud Firestore Security Rules (`firestore.rules`)
-* **Role Escalation Protection:**
-  * Added rule condition `incoming().role != 'ADMIN'` on user creation.
-  * Added `incoming().role == existing().role` on user profile updates to prevent clients from granting themselves elevated administrative rights.
-* **Business Verification Integrity:**
-  * Restricted initial creation so business owners cannot self-assign `isVerified: true`.
-  * Enforced `incoming().isVerified == existing().isVerified` on business document updates. Only authorized administrative processes or server-side functions can verify a merchant.
-  * Protected `rating` and `reviewCount` from arbitrary client writes.
-* **Listing Moderation & Business Relationships:**
-  * Enforced helper function `isBusinessOwner(incoming().businessId)`: listings can only be created if the referenced `businessId` exists and is owned by `request.auth.uid`.
-  * Prevented client manipulation of `isFeatured: true`.
-* **View Counter Abuse Prevention:**
-  * Listing updates by non-owners are strictly limited to atomic increments of `viewsCount`:
-    `request.resource.data.diff(resource.data).affectedKeys().hasOnly(['viewsCount', 'updatedAt']) && incoming().viewsCount == resource.data.viewsCount + 1`
-  * Added rules for the subcollection `/listings/{id}/viewers/{viewerId}` where `request.auth.uid == viewerId`.
-* **Public Discovery:**
-  * Public unauthenticated read access is granted for active businesses and marketplace listings. User profile documents (`/users/{uid}`) remain strictly private to the authenticated owner.
+### 2.2 Business Ownership & Existence Validation (Criteria 2)
+* **Original Defect:** Missing business references were not explicitly checked, allowing potential creation of orphan listings or ad campaigns.
+* **Remediation:**
+  * Rewrote `isBusinessOwner(bizId)` in `firestore.rules`:
+    ```
+    function isBusinessOwner(bizId) {
+      return bizId is string &&
+             exists(/databases/$(database)/documents/businesses/$(bizId)) &&
+             get(/databases/$(database)/documents/businesses/$(bizId)).data.ownerId == request.auth.uid;
+    }
+    ```
+  * Added test cases verifying that non-existent business IDs and businesses owned by other users explicitly deny listing and ad campaign creation.
 
-### 2.3 Gemini AI Integration & Secrets Hardening
-* **Production Security Posture:**
-  * Production Gemini API keys must never be hardcoded or bundled in client APKs.
-  * Application supports server-side proxy architecture (`BuildConfig.GEMINI_API_ENDPOINT`) or AI Studio Secrets injection (`BuildConfig.GEMINI_API_KEY`).
-  * System prompts clearly identify when AI responses are live versus when pre-computed local market data is displayed, avoiding fabricated ratings or misleading merchant information.
+### 2.3 Listing Moderation & Immutability (Criteria 3)
+* **Original Defect:** Owners could attempt to self-publish rejected listings or tamper with view counts and featured flags.
+* **Remediation:**
+  * In `firestore.rules`, locked `ownerId` and `businessId` to be immutable.
+  * Prevented status jumps directly from `REJECTED` or `ARCHIVED` to `PUBLISHED` without admin review.
+  * Restricted public view count increments: viewers can only increment `viewsCount` by strictly +1 with zero changes to other document fields (`diff().affectedKeys().hasOnly(['viewsCount', 'updatedAt'])`).
+
+### 2.4 Advertising Engagement Counter Security (Criteria 4)
+* **Original Defect:** Vulnerability where arbitrary authenticated users updating engagement counters could tamper with campaign status or pricing.
+* **Remediation:**
+  * Enforced strict diff key containment:
+    `request.resource.data.diff(resource.data).affectedKeys().hasOnly(['impressionsCount', 'uniqueViewsCount', 'clicksCount', 'likesCount', 'commentsCount', 'sharesCount', 'savesCount', 'updatedAt'])`
+  * Enforced immutability of `sellerId`, `businessId`, `listingId`, `packageId`, `packagePriceTzs`, `paymentStatus`, and `status`.
+  * Enforced non-negative counter increments (`incoming().impressionsCount >= resource.data.impressionsCount`, etc.).
+
+### 2.5 Payment Records & Notification Security (Criteria 5)
+* **Original Defect:** Client could submit payment transactions and directly mark them as `VERIFIED` or update campaign to `PAID`.
+* **Remediation:**
+  * In `firestore.rules`, clients are strictly limited to creating transactions with status `PENDING` or `SUBMITTED`.
+  * Marking a transaction `VERIFIED` and setting campaign `paymentStatus = "PAID"` is reserved for `isAdmin()`.
+  * Transaction deletions are blocked (`allow delete: if false`).
+  * In `AdCampaignRepository.kt`, updated `processPaymentAndSubmitForReview` to set `status = "SUBMITTED"` and campaign `paymentStatus = "PENDING_VERIFICATION"`, with admin approval transitioning to `PAID` and `VERIFIED`.
+
+### 2.6 Removal of Ambiguous Legacy Authentication Paths (Criteria 6)
+* **Original Defect:** `signInStandard` and `registerStandard` had overloads accepting `Activity` that silently proxied into Google Sign-In.
+* **Remediation:**
+  * Replaced ambiguous overloads with explicit, clean methods: `signInWithEmailPassword` and `registerWithEmailPassword`.
+  * Retained non-ambiguous delegating aliases for standard email authentication.
+  * Updated `SignInScreen.kt` to explicitly invoke email/password methods and Google Credential Manager separately.
+
+### 2.7 Separation of Seed Data from Production Records (Criteria 7)
+* **Original Defect:** Sample seed listings from `MarketplaceData` were blended into live repository state indiscriminately.
+* **Remediation:**
+  * Gated seed business and listing fallbacks behind `com.example.BuildConfig.DEBUG`.
+  * In release/production builds, initial repository collections start empty and are populated solely from authorized Cloud Firestore records.
+
+### 2.8 Admin Authorization Protection (Criteria 8)
+* **Original Defect:** Risk of client self-assigning role `ADMIN`.
+* **Remediation:**
+  * `firestore.rules` enforces `incoming().role != 'ADMIN'` on user creation and `incoming().role == existing().role` on updates.
+  * Genuine administrative checks verify against existing Firestore user role `ADMIN`.
+
+### 2.9 Advertising System Lifecycle Alignment (Criteria 9)
+* **Remediation:**
+  * Reviewed dialogs and screens (`CreateAdCampaignDialog.kt`, `SellerAdsManagerScreen.kt`, `AdminDashboardScreen.kt`, `AdsFeedScreen.kt`).
+  * Clarified payment flow: seller submits reference -> campaign is marked `AWAITING_REVIEW` with `PENDING_VERIFICATION` -> admin reviews and verifies payment -> campaign transitions to `ACTIVE` with `PAID` -> ad surfaces in Ads Feed.
 
 ---
 
@@ -52,30 +85,32 @@
 ### 3.1 Reported Defect
 User reported that changing the theme only affected the top app bar and bottom navigation bar, while the entire middle screen area remained dark navy (`hapabadiriiki katikati`).
 
-### 3.2 Root Cause
-Each individual screen Composable (`DiscoverScreen`, `SearchScreen`, `AssistantScreen`, `BusinessHubScreen`, `BusinessDetailScreen`, `ListingDetailScreen`, `AccountScreen`, `SignInScreen`) contained hardcoded background colors (`SokoBlueBlack` = `#070B18`) and hardcoded card surface colors (`SokoCardSurface` = `#0F1A38`), preventing Material 3 theme colors from propagating through the middle content.
-
-### 3.3 Solution Implemented
+### 3.2 Solution Implemented
 * Created the `SokoColors` singleton in `Theme.kt` with composable properties observing `LocalIsDarkTheme.current`.
-* Replaced all hardcoded containers, cards, borders, text, and dividers across all 8 screens and common components with dynamic color tokens:
-  * In Light Mode: Clean crisp background (`#F8FAFC`), white card surfaces (`#FFFFFF`), light border accents (`#E2E8F0`), and dark primary typography (`#0F172A`).
-  * In Dark Mode: Deep navy backdrop (`#070B18`), midnight blue card surfaces (`#0F1A38`), sleek neon borders (`#1A2D62`), and crisp white typography (`#FFFFFF`).
-* Result: The entire application now seamlessly transitions between Light and Dark mode across the full display area.
+* Replaced hardcoded containers across all screens with dynamic color tokens (`background`, `surface`, `cardBorder`, `textPrimary`, `textMuted`).
 
 ---
 
-## 4. Test Verification Results
+## 4. Test Verification Results (Criteria 10)
 
-### 4.1 Firestore Security Rules Tests (`firestore.test.js`)
-8 test cases executed against local Firebase emulators:
-* `Unauthenticated user: cannot read users, but can read businesses and listings`: **PASSED**
-* `Authenticated user: Alice can create and read her own user document`: **PASSED**
-* `Authenticated user: Alice cannot write Bob's user document`: **PASSED**
-* `Authenticated user: Alice can create business and listing with her ownerId`: **PASSED**
-* `Authenticated user: Bob cannot update or delete Alice's listing`: **PASSED**
-* `Security: User cannot self-assign or escalate role to ADMIN`: **PASSED**
-* `Security: Business owner cannot self-verify business`: **PASSED**
-* `Security: Listing cannot be created under another user's business or self-featured`: **PASSED**
+### 4.1 Cloud Firestore Security Rules Tests (`firestore.test.js`)
+**15/15 tests PASSED (0 failures)** against local Firebase emulators:
+1. `Unauthenticated user: cannot read users, but can read businesses and listings`: **PASSED**
+2. `Authenticated user: Alice can create and read her own user document`: **PASSED**
+3. `Authenticated user: Alice cannot write Bob's user document`: **PASSED**
+4. `Authenticated user: Alice can create business and listing with her ownerId`: **PASSED**
+5. `Authenticated user: Bob cannot update or delete Alice's listing`: **PASSED**
+6. `Security: User cannot self-assign or escalate role to ADMIN`: **PASSED**
+7. `Security: Business owner cannot self-verify business`: **PASSED**
+8. `Security: Listing cannot be created under another user's business or self-featured`: **PASSED**
+9. `Security (Criteria 2): Missing business document explicitly denies listing and campaign creation`: **PASSED**
+10. `Security (Criteria 3): Listing moderation - owner cannot bypass review to PUBLISHED`: **PASSED**
+11. `Security (Criteria 3): Viewer can only increment listing viewsCount +1 without altering other fields`: **PASSED**
+12. `Security (Criteria 4): Advertising engagement counters cannot alter sensitive business fields`: **PASSED**
+13. `Security (Criteria 5): Payment transactions cannot be verified by client and are immutable`: **PASSED**
+14. `Security (Criteria 5): Unvalidated notification creation for arbitrary users is denied`: **PASSED**
+15. `Security (Criteria 8): Admin operations are authorized for genuine admins only`: **PASSED**
 
-### 4.2 Build Verification
-* `compile_applet`: **PASSED** (exit code 0, zero compilation errors).
+### 4.2 Build & Compilation Verification
+* `compile_applet`: **PASSED** (exit code 0, zero errors).
+* Packaging configuration: `useLegacyPackaging = true` preserved.

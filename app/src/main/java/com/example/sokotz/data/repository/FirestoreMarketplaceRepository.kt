@@ -30,13 +30,7 @@ import kotlinx.coroutines.tasks.await
 import java.util.UUID
 
 private fun provideFirestore(context: Context): FirebaseFirestore {
-    com.example.sokotz.data.util.FirebaseInitHelper.ensureInitialized(context)
-    val dbId = context.applicationContext.getString(R.string.firestore_database_id)
-    return try {
-        FirebaseFirestore.getInstance(com.google.firebase.FirebaseApp.getInstance(), dbId)
-    } catch (_: Exception) {
-        FirebaseFirestore.getInstance(dbId)
-    }
+    return com.example.sokotz.data.util.FirebaseInitHelper.getFirestore(context)
 }
 
 class FirestoreMarketplaceRepository(
@@ -59,10 +53,16 @@ class FirestoreMarketplaceRepository(
     private val _categories = MutableStateFlow<List<Category>>(MarketplaceData.categories)
     val categories: StateFlow<List<Category>> = _categories.asStateFlow()
 
-    private val _businesses = MutableStateFlow<List<BusinessProfile>>(MarketplaceData.initialBusinesses)
+    private val initialSeedBusinesses: List<BusinessProfile> =
+        if (com.example.BuildConfig.DEBUG) MarketplaceData.initialBusinesses else emptyList()
+
+    private val initialSeedListings: List<Listing> =
+        if (com.example.BuildConfig.DEBUG) MarketplaceData.initialListings else emptyList()
+
+    private val _businesses = MutableStateFlow<List<BusinessProfile>>(initialSeedBusinesses)
     val businesses: StateFlow<List<BusinessProfile>> = _businesses.asStateFlow()
 
-    private val _listings = MutableStateFlow<List<Listing>>(MarketplaceData.initialListings)
+    private val _listings = MutableStateFlow<List<Listing>>(initialSeedListings)
     val listings: StateFlow<List<Listing>> = _listings.asStateFlow()
 
     private val _language = MutableStateFlow(AppLanguage.SW)
@@ -152,8 +152,12 @@ class FirestoreMarketplaceRepository(
                         val firestoreList = snapshot.documents.mapNotNull { doc ->
                             doc.toObject(BusinessProfile::class.java)?.copy(id = doc.id)
                         }
-                        val combined = firestoreList + MarketplaceData.initialBusinesses.filter { seed ->
-                            firestoreList.none { it.id == seed.id }
+                        val combined = if (com.example.BuildConfig.DEBUG) {
+                            firestoreList + MarketplaceData.initialBusinesses.filter { seed ->
+                                firestoreList.none { it.id == seed.id }
+                            }
+                        } else {
+                            firestoreList
                         }
                         _businesses.value = combined
                     }
@@ -175,8 +179,12 @@ class FirestoreMarketplaceRepository(
                         val firestoreList = snapshot.documents.mapNotNull { doc ->
                             doc.toObject(Listing::class.java)?.copy(id = doc.id)
                         }
-                        val combined = firestoreList + MarketplaceData.initialListings.filter { seed ->
-                            firestoreList.none { it.id == seed.id }
+                        val combined = if (com.example.BuildConfig.DEBUG) {
+                            firestoreList + MarketplaceData.initialListings.filter { seed ->
+                                firestoreList.none { it.id == seed.id }
+                            }
+                        } else {
+                            firestoreList
                         }
                         _listings.value = combined
                     }
@@ -192,8 +200,8 @@ class FirestoreMarketplaceRepository(
         businessesListener = null
         listingsListener?.remove()
         listingsListener = null
-        _businesses.value = MarketplaceData.initialBusinesses
-        _listings.value = MarketplaceData.initialListings
+        _businesses.value = initialSeedBusinesses
+        _listings.value = initialSeedListings
     }
 
     fun observeListings(): Flow<List<Listing>> = _listings

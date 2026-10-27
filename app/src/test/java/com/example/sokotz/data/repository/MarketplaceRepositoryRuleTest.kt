@@ -44,9 +44,26 @@ class MarketplaceRepositoryRuleTest : FirestoreEmulatorTestBase() {
         val uid = signInTestUser("daudi@sokotz.tz")
         val repo = FirestoreMarketplaceRepository(firestore, auth)
 
+        // 1. Must register business first so isBusinessOwner(bizId) passes
+        val bizResult = withTimeout(DEFAULT_TIMEOUT_MS) {
+            repo.registerBusinessProfile(
+                name = "Kariakoo Electronics Hub",
+                categorySlug = "elektroniki",
+                city = "Dar es Salaam",
+                district = "Ilala",
+                phoneNumber = "+255712345678",
+                whatsappNumber = "+255712345678",
+                description = "Duka la vifaa bora vya kielektroniki Kariakoo"
+            )
+        }
+        assertTrue(bizResult.isSuccess)
+        val businessId = bizResult.getOrNull()
+        assertNotNull(businessId)
+
+        // 2. Create listing under verified owned business
         val result = withTimeout(DEFAULT_TIMEOUT_MS) {
             repo.createListing(
-                businessId = "biz_kariakoo_1",
+                businessId = businessId!!,
                 businessName = "Kariakoo Electronics Hub",
                 title = "Samsung Galaxy S24 Ultra",
                 priceTzs = 2400000L,
@@ -69,6 +86,29 @@ class MarketplaceRepositoryRuleTest : FirestoreEmulatorTestBase() {
         assertNotNull(listing)
         assertEquals("Samsung Galaxy S24 Ultra", listing?.titleSw)
         assertEquals(uid, listing?.ownerId)
+    }
+
+    @Test
+    fun createListing_nonexistentBusiness_fails() = runBlocking {
+        signInTestUser("daudi@sokotz.tz")
+        val repo = FirestoreMarketplaceRepository(firestore, auth)
+
+        val result = withTimeout(DEFAULT_TIMEOUT_MS) {
+            repo.createListing(
+                businessId = "biz_nonexistent_999",
+                businessName = "Fake Shop",
+                title = "Bidhaa Hewa",
+                priceTzs = 10000L,
+                categorySlug = "elektroniki",
+                description = "Bidhaa isiyo na duka halisi",
+                type = "PRODUCT",
+                city = "Dar es Salaam",
+                phoneNumber = "+255712345678",
+                whatsappNumber = "+255712345678"
+            )
+        }
+
+        assertTrue(result.isFailure)
     }
 
     @Test

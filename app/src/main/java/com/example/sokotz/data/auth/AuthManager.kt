@@ -61,13 +61,7 @@ class AuthManager(private val context: Context) {
     }
 
     private fun getDb(): FirebaseFirestore {
-        com.example.sokotz.data.util.FirebaseInitHelper.ensureInitialized(context)
-        val dbId = context.getString(R.string.firestore_database_id)
-        return try {
-            FirebaseFirestore.getInstance(com.google.firebase.FirebaseApp.getInstance(), dbId)
-        } catch (_: Exception) {
-            FirebaseFirestore.getInstance(dbId)
-        }
+        return com.example.sokotz.data.util.FirebaseInitHelper.getFirestore(context)
     }
 
     fun clearError() {
@@ -161,7 +155,7 @@ class AuthManager(private val context: Context) {
     /**
      * Genuine email/password sign-in using FirebaseAuth.signInWithEmailAndPassword
      */
-    fun signInStandard(
+    fun signInWithEmailPassword(
         email: String,
         password: String,
         scope: CoroutineScope,
@@ -213,19 +207,23 @@ class AuthManager(private val context: Context) {
         }
     }
 
-    // Overload for backward compatibility
-    fun signInStandard(activity: Activity, email: String, scope: CoroutineScope) {
-        val trimmedEmail = email.trim()
-        if (trimmedEmail.isNotBlank()) {
-            pendingDisplayName = trimmedEmail.substringBefore("@")
-        }
-        signInWithGoogle(activity, scope)
+    /**
+     * Alias for signInWithEmailPassword for backward compatibility
+     */
+    fun signInStandard(
+        email: String,
+        password: String,
+        scope: CoroutineScope,
+        onSuccess: () -> Unit = {},
+        onError: (String) -> Unit = {}
+    ) {
+        signInWithEmailPassword(email, password, scope, onSuccess, onError)
     }
 
     /**
      * Genuine email/password registration using FirebaseAuth.createUserWithEmailAndPassword
      */
-    fun registerStandard(
+    fun registerWithEmailPassword(
         email: String,
         password: String,
         displayName: String,
@@ -314,24 +312,24 @@ class AuthManager(private val context: Context) {
         }
     }
 
-    // Overload for backward compatibility with Activity callers
+    /**
+     * Alias for registerWithEmailPassword for backward compatibility
+     */
     fun registerStandard(
-        activity: Activity,
+        email: String,
+        password: String,
         displayName: String,
         phone: String,
         role: String,
         acceptedTerms: Boolean,
         scope: CoroutineScope,
-        aiPreferredName: String = ""
+        aiPreferredName: String = "",
+        onSuccess: () -> Unit = {},
+        onError: (String) -> Unit = {}
     ) {
-        setPendingRegistration(
-            name = displayName,
-            phone = phone,
-            role = role,
-            acceptedTerms = acceptedTerms,
-            aiPreferredName = aiPreferredName
+        registerWithEmailPassword(
+            email, password, displayName, phone, role, acceptedTerms, scope, aiPreferredName, onSuccess, onError
         )
-        signInWithGoogle(activity, scope)
     }
 
     /**

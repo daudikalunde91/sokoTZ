@@ -379,7 +379,7 @@ fun SignInScreen(
                                     validationError = if (isSw) "Tafadhali weka barua pepe na nenosiri" else "Please enter email and password"
                                     return@Button
                                 }
-                                authManager.signInStandard(
+                                authManager.signInWithEmailPassword(
                                     email = signInEmail.trim(),
                                     password = signInPassword,
                                     scope = scope,
@@ -649,7 +649,7 @@ fun SignInScreen(
                                     return@Button
                                 }
 
-                                authManager.registerStandard(
+                                authManager.registerWithEmailPassword(
                                     email = registerEmail.trim(),
                                     password = registerPassword,
                                     displayName = registerName.trim(),

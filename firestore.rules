@@ -21,10 +21,12 @@ service cloud.firestore {
              get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'ADMIN';
     }
 
+    // A business must exist in the database and be owned by the authenticated caller.
+    // Missing business documents or businesses owned by other users explicitly return false.
     function isBusinessOwner(bizId) {
-      return (bizId == request.auth.uid) ||
-             (!exists(/databases/$(database)/documents/businesses/$(bizId))) ||
-             (get(/databases/$(database)/documents/businesses/$(bizId)).data.ownerId == request.auth.uid);
+      return bizId is string &&
+             exists(/databases/$(database)/documents/businesses/$(bizId)) &&
+             get(/databases/$(database)/documents/businesses/$(bizId)).data.ownerId == request.auth.uid;
     }
 
     function isValidUser(data) {
@@ -71,7 +73,7 @@ service cloud.firestore {
              data.priceTzs is int && data.priceTzs >= 0 &&
              data.categorySlug is string && data.categorySlug.size() <= 100 &&
              data.type is string && (data.type == 'PRODUCT' || data.type == 'SERVICE') &&
-             (!('status' in data) || (data.status is string && data.status.size() <= 50)) &&
+             (!('status' in data) || (data.status is string && data.status in ['PENDING_REVIEW', 'PUBLISHED', 'REJECTED', 'ARCHIVED'])) &&
              (!('city' in data) || (data.city is string && data.city.size() <= 100)) &&
              (!('isFeatured' in data) || data.isFeatured is bool) &&
              (!('imageUrl' in data) || (data.imageUrl is string && data.imageUrl.size() <= 250000)) &&
@@ -90,17 +92,20 @@ service cloud.firestore {
     // Users collection
     match /users/{userId} {
       allow get, list: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+      // Self registration: user can only register as CUSTOMER or BUSINESS_OWNER, never ADMIN
       allow create: if isSignedIn() &&
                     request.auth.uid == userId &&
                     incoming().userId == request.auth.uid &&
-                    incoming().role != 'ADMIN' &&
+                    incoming().role in ['CUSTOMER', 'BUSINESS_OWNER'] &&
                     isValidUser(incoming());
+      // Profile updates: user cannot escalate role to ADMIN
       allow update: if isSignedIn() &&
                     (
                       (request.auth.uid == userId &&
                        resource != null &&
                        incoming().userId == existing().userId &&
-                       incoming().role != 'ADMIN' &&
+                       // Non-admin callers can only stay CUSTOMER/BUSINESS_OWNER or preserve their existing role
+                       (incoming().role in ['CUSTOMER', 'BUSINESS_OWNER'] || incoming().role == existing().role) &&
                        isValidUser(incoming())) ||
                       isAdmin()
                     );
@@ -121,6 +126,7 @@ service cloud.firestore {
                     (
                       (resource.data.ownerId == request.auth.uid &&
                        incoming().ownerId == resource.data.ownerId &&
+                       // Owner cannot verify their own business or fabricate ratings
                        incoming().isVerified == resource.data.isVerified &&
                        (!('rating' in incoming()) || incoming().rating == resource.data.rating) &&
                        (!('reviewCount' in incoming()) || incoming().reviewCount == resource.data.reviewCount) &&
@@ -135,25 +141,40 @@ service cloud.firestore {
     // Listings collection
     match /listings/{listingId} {
       allow get, list: if true;
+      // Creation: must be linked to an EXISTING business owned by the authenticated caller
       allow create: if isSignedIn() &&
                     incoming().ownerId == request.auth.uid &&
                     (!('isFeatured' in incoming()) || incoming().isFeatured == false) &&
                     (!('viewsCount' in incoming()) || incoming().viewsCount == 0) &&
                     isBusinessOwner(incoming().businessId) &&
+                    (!('status' in incoming()) || incoming().status in ['PENDING_REVIEW', 'PUBLISHED']) &&
                     isValidListing(incoming());
+      // Updates:
+      // 1. Admin can perform any moderation, verification, or featuring
+      // 2. Owner can update descriptive fields but CANNOT self-feature, tamper with views, or bypass review
+      // 3. Public viewers can only increment viewsCount atomically
       allow update: if isSignedIn() && resource != null && (
+        isAdmin() ||
         (
           resource.data.ownerId == request.auth.uid &&
           incoming().ownerId == resource.data.ownerId &&
           incoming().businessId == resource.data.businessId &&
-          incoming().isFeatured == resource.data.isFeatured &&
+          (!('isFeatured' in resource.data) || incoming().isFeatured == resource.data.isFeatured) &&
+          incoming().viewsCount == resource.data.viewsCount &&
+          // Status moderation rules:
+          // A rejected listing can only transition to PENDING_REVIEW (re-submit for review), not directly to PUBLISHED
+          (
+            incoming().status == resource.data.status ||
+            (resource.data.status == 'REJECTED' && incoming().status == 'PENDING_REVIEW') ||
+            (resource.data.status == 'PUBLISHED' && incoming().status == 'ARCHIVED') ||
+            (resource.data.status == 'ARCHIVED' && incoming().status == 'PENDING_REVIEW')
+          ) &&
           isValidListing(incoming())
         ) ||
         (
           request.resource.data.diff(resource.data).affectedKeys().hasOnly(['viewsCount', 'updatedAt']) &&
           incoming().viewsCount == resource.data.viewsCount + 1
-        ) ||
-        isAdmin()
+        )
       );
       allow delete: if isSignedIn() &&
                     resource != null &&
@@ -190,35 +211,69 @@ service cloud.firestore {
                           (isSignedIn() && resource.data.sellerId == request.auth.uid) ||
                           isAdmin();
 
-      // Sellers can create campaigns for their own listings
+      // Sellers can create campaigns for their own listings.
+      // Initial paymentStatus can NEVER be 'PAID'. Counters must be 0.
       allow create: if isSignedIn() &&
                     incoming().sellerId == request.auth.uid &&
                     isBusinessOwner(incoming().businessId) &&
+                    incoming().paymentStatus in ['UNPAID', 'PENDING_VERIFICATION'] &&
                     incoming().status in ['DRAFT', 'AWAITING_PAYMENT', 'AWAITING_REVIEW'] &&
-                    (!('moderatedByAdminId' in incoming()) || incoming().moderatedByAdminId == null);
+                    (!('moderatedByAdminId' in incoming()) || incoming().moderatedByAdminId == null) &&
+                    (!('impressionsCount' in incoming()) || incoming().impressionsCount == 0) &&
+                    (!('clicksCount' in incoming()) || incoming().clicksCount == 0) &&
+                    (!('likesCount' in incoming()) || incoming().likesCount == 0) &&
+                    (!('commentsCount' in incoming()) || incoming().commentsCount == 0) &&
+                    (!('sharesCount' in incoming()) || incoming().sharesCount == 0) &&
+                    (!('savesCount' in incoming()) || incoming().savesCount == 0);
 
       // Updates:
-      // 1. Admin can approve, reject, pause, resume, or edit any campaign
-      // 2. Seller can update draft, request reinstatement, permanently close campaign, or record payments
-      // 3. Authenticated buyers can increment engagement counters atomically (impressions, clicks, shares)
+      // 1. Admin can approve (mark PAID/ACTIVE), reject, suspend, resume, or edit any campaign
+      // 2. Seller can update draft, submit for review, request reinstatement, or permanently close campaign
+      //    (Seller CANNOT change paymentStatus to PAID or modify public engagement counters)
+      // 3. Public engagement metrics: ONLY counter keys can be touched, sensitive fields must remain identical
       allow update: if isSignedIn() && resource != null && (
         isAdmin() ||
         (
           resource.data.sellerId == request.auth.uid &&
           incoming().sellerId == resource.data.sellerId &&
           incoming().businessId == resource.data.businessId &&
+          incoming().listingId == resource.data.listingId &&
+          incoming().packageId == resource.data.packageId &&
+          incoming().packagePriceTzs == resource.data.packagePriceTzs &&
+          // Seller CANNOT change paymentStatus to PAID
+          (incoming().paymentStatus == resource.data.paymentStatus || (resource.data.paymentStatus == 'UNPAID' && incoming().paymentStatus == 'PENDING_VERIFICATION')) &&
+          // Counters must not be forged by seller update
+          incoming().impressionsCount == resource.data.impressionsCount &&
+          incoming().clicksCount == resource.data.clicksCount &&
+          incoming().likesCount == resource.data.likesCount &&
+          incoming().commentsCount == resource.data.commentsCount &&
+          incoming().sharesCount == resource.data.sharesCount &&
+          incoming().savesCount == resource.data.savesCount &&
           (
             // Voluntary permanent closure
-            incoming().status == 'PERMANENTLY_CLOSED' ||
+            (resource.data.status != 'PERMANENTLY_CLOSED' && incoming().status == 'PERMANENTLY_CLOSED') ||
             // Seller requesting reinstatement when product is available again
             (resource.data.status == 'PAUSED_PRODUCT_UNAVAILABLE' && incoming().reinstatementRequested == true) ||
-            // Draft updates
-            resource.data.status in ['DRAFT', 'AWAITING_PAYMENT', 'AWAITING_REVIEW']
+            // Draft edits or submitting for review
+            (resource.data.status in ['DRAFT', 'AWAITING_PAYMENT'] && incoming().status in ['DRAFT', 'AWAITING_PAYMENT', 'AWAITING_REVIEW'])
           )
         ) ||
         (
-          // Public engagement metrics update
-          request.resource.data.diff(resource.data).affectedKeys().hasAny(['impressionsCount', 'uniqueViewsCount', 'clicksCount', 'likesCount', 'commentsCount', 'sharesCount', 'savesCount', 'updatedAt'])
+          // Public engagement metrics: strictly ONLY counter keys and updatedAt
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['impressionsCount', 'uniqueViewsCount', 'clicksCount', 'likesCount', 'commentsCount', 'sharesCount', 'savesCount', 'updatedAt']) &&
+          // Immutable core business fields
+          incoming().sellerId == resource.data.sellerId &&
+          incoming().businessId == resource.data.businessId &&
+          incoming().listingId == resource.data.listingId &&
+          incoming().packageId == resource.data.packageId &&
+          incoming().packagePriceTzs == resource.data.packagePriceTzs &&
+          incoming().paymentStatus == resource.data.paymentStatus &&
+          incoming().status == resource.data.status &&
+          // Increments must be non-negative
+          incoming().impressionsCount >= resource.data.impressionsCount &&
+          incoming().clicksCount >= resource.data.clicksCount &&
+          incoming().sharesCount >= resource.data.sharesCount &&
+          incoming().savesCount >= resource.data.savesCount
         )
       );
 
@@ -252,11 +307,22 @@ service cloud.firestore {
       allow get, list, update, delete: if isAdmin();
     }
 
-    // In-App Notifications: Recipient-only access
+    // In-App Notifications: Recipient-only access; creation restricted to Admins and validated user actions
     match /ad_notifications/{notificationId} {
       allow get, list: if isSignedIn() && request.auth.uid == resource.data.recipientUserId;
-      allow update: if isSignedIn() && request.auth.uid == resource.data.recipientUserId;
-      allow create: if isSignedIn(); // triggered by campaign events
+      allow update: if isSignedIn() && request.auth.uid == resource.data.recipientUserId &&
+                       request.resource.data.diff(resource.data).affectedKeys().hasOnly(['isRead']);
+      allow create: if isAdmin() ||
+                    (
+                      isSignedIn() &&
+                      incoming().recipientUserId is string &&
+                      (
+                        (incoming().recipientUserId != request.auth.uid &&
+                         incoming().type in ['COMMENT_RECEIVED', 'AD_REPORTED', 'REPLY_RECEIVED']) ||
+                        (incoming().recipientUserId == request.auth.uid &&
+                         incoming().type in ['PAYMENT_SUBMITTED', 'REINSTATEMENT_REQUESTED', 'PRODUCT_PAUSED'])
+                      )
+                    );
       allow delete: if isSignedIn() && (request.auth.uid == resource.data.recipientUserId || isAdmin());
     }
 
@@ -273,7 +339,11 @@ service cloud.firestore {
     // Payment Transactions: Idempotent and auditable financial records
     match /payment_transactions/{txnId} {
       allow get, list: if isSignedIn() && (request.auth.uid == resource.data.sellerId || isAdmin());
-      allow create: if isSignedIn() && request.auth.uid == incoming().sellerId;
+      // Seller can record payment submission, but CANNOT mark it VERIFIED
+      allow create: if isSignedIn() &&
+                    request.auth.uid == incoming().sellerId &&
+                    incoming().status in ['PENDING', 'SUBMITTED'];
+      // Verification is strictly reserved for authorized administrators
       allow update: if isAdmin();
       allow delete: if false; // immutable financial transaction ledger
     }

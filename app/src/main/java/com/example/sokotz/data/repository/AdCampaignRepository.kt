@@ -30,7 +30,7 @@ import java.util.UUID
 
 class AdCampaignRepository private constructor(private val appContext: Context) {
 
-    private val db = FirebaseFirestore.getInstance()
+    private val db = com.example.sokotz.data.util.FirebaseInitHelper.getFirestore(appContext)
     private val auth = FirebaseAuth.getInstance()
     private val scope = CoroutineScope(Dispatchers.IO)
 
@@ -462,15 +462,15 @@ class AdCampaignRepository private constructor(private val appContext: Context) 
                 provider = provider,
                 reference = ref,
                 amountTzs = campaign.packagePriceTzs,
-                status = "VERIFIED",
+                status = "SUBMITTED",
                 idempotencyKey = idempotencyKey
             )
             txnDoc.set(txn).await()
 
-            // 2. Update campaign to PAID and submit to AWAITING_REVIEW
+            // 2. Update campaign to PENDING_VERIFICATION and submit to AWAITING_REVIEW
             db.collection("ad_campaigns").document(campaignId).update(
                 mapOf(
-                    "paymentStatus" to "PAID",
+                    "paymentStatus" to "PENDING_VERIFICATION",
                     "paymentReference" to ref,
                     "paymentMethod" to provider,
                     "status" to AdCampaignStatus.AWAITING_REVIEW.name,
@@ -481,11 +481,11 @@ class AdCampaignRepository private constructor(private val appContext: Context) 
             // 3. Create notification for seller
             createNotification(
                 recipientUserId = sellerId,
-                titleSw = "Malipo Yamethibitishwa: ${campaign.adTitle}",
-                titleEn = "Payment Confirmed: ${campaign.adTitle}",
-                messageSw = "Malipo ya TZS ${txn.formattedAmount} yamethibitishwa kwa kumbukumbu $ref. Kampeni yako sasa ipo kwenye ukaguzi wa wasimamizi wa SokoTZ.",
-                messageEn = "Payment of TZS ${txn.formattedAmount} verified with ref $ref. Your campaign is now submitted for SokoTZ admin review.",
-                type = "PAYMENT_CONFIRMED",
+                titleSw = "Malipo Yamewasilishwa: ${campaign.adTitle}",
+                titleEn = "Payment Submitted: ${campaign.adTitle}",
+                messageSw = "Ombi la malipo ya TZS ${txn.formattedAmount} limewasilishwa kwa kumbukumbu $ref. Kampeni yako sasa ipo kwenye ukaguzi wa wasimamizi wa SokoTZ kabla ya kuwekwa hewani.",
+                messageEn = "Payment submission of TZS ${txn.formattedAmount} recorded with ref $ref. Your campaign is awaiting SokoTZ admin review and verification before going live.",
+                type = "PAYMENT_SUBMITTED",
                 campaignId = campaignId
             )
 
@@ -627,6 +627,7 @@ class AdCampaignRepository private constructor(private val appContext: Context) 
             db.collection("ad_campaigns").document(campaignId).update(
                 mapOf(
                     "status" to AdCampaignStatus.ACTIVE.name,
+                    "paymentStatus" to "PAID",
                     "moderatedByAdminId" to adminId,
                     "moderationNotes" to notes.ifBlank { "Imeidhinishwa na Msimamizi (Approved by SokoTZ Admin)" },
                     "startDate" to Timestamp(now),
@@ -635,6 +636,24 @@ class AdCampaignRepository private constructor(private val appContext: Context) 
                     "updatedAt" to FieldValue.serverTimestamp()
                 )
             ).await()
+
+            // Also verify any associated payment transaction record
+            try {
+                val txns = db.collection("payment_transactions")
+                    .whereEqualTo("campaignId", campaignId)
+                    .get().await()
+                for (tDoc in txns.documents) {
+                    tDoc.reference.update(
+                        mapOf(
+                            "status" to "VERIFIED",
+                            "verifiedByAdminId" to adminId,
+                            "verifiedAt" to FieldValue.serverTimestamp()
+                        )
+                    ).await()
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "Failed updating payment_transactions for campaign: ${e.message}")
+            }
 
             createNotification(
                 recipientUserId = campaign.sellerId,

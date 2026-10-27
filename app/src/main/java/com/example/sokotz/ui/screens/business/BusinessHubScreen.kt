@@ -32,6 +32,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Business
 import androidx.compose.material.icons.filled.CameraAlt
+import androidx.compose.material.icons.filled.Campaign
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
@@ -115,6 +116,7 @@ fun BusinessHubScreen(
     onNavigateToListing: (String) -> Unit,
     onNavigateToAssistant: () -> Unit,
     onNavigateToSignIn: () -> Unit = {},
+    onNavigateToAdsManager: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -394,6 +396,55 @@ fun BusinessHubScreen(
                                     )
                                     Text(
                                         text = if (isSw) "Bofya hapa sokoTZ Msaidizi akusaidie kutunga maelezo ya mauzo" else "Chat with sokoTZ AI to draft sales copy and descriptions",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = SokoColors.textMuted
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    // SokoTZ Ads Feed (TikTok-Style Video Campaigns) Banner
+                    item {
+                        Card(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(12.dp))
+                                .border(1.dp, SokoNeonBlue.copy(alpha = 0.7f), RoundedCornerShape(12.dp))
+                                .clickable { onNavigateToAdsManager() },
+                            colors = CardDefaults.cardColors(containerColor = SokoColors.cardSurface)
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(16.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(44.dp)
+                                        .clip(CircleShape)
+                                        .background(SokoNeonBlue.copy(alpha = 0.15f))
+                                        .border(1.dp, SokoNeonBlue, CircleShape),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Campaign,
+                                        contentDescription = null,
+                                        tint = SokoNeonBlue,
+                                        modifier = Modifier.size(24.dp)
+                                    )
+                                }
+                                Spacer(modifier = Modifier.width(14.dp))
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = if (isSw) "Matangazo ya Video (Ads Feed)" else "Video Ads Feed Campaigns",
+                                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                                        color = SokoColors.textPrimary
+                                    )
+                                    Text(
+                                        text = if (isSw)
+                                            "Tangaza bidhaa au huduma yako kwenye video feed ya mtindo wa TikTok kwa wateja nchini kote."
+                                        else
+                                            "Promote your listings with full-screen TikTok-style video ads reaching thousands of buyers.",
                                         style = MaterialTheme.typography.bodySmall,
                                         color = SokoColors.textMuted
                                     )

@@ -15,11 +15,13 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Explore
+import androidx.compose.material.icons.filled.PlayCircle
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Storefront
 import androidx.compose.material.icons.outlined.AccountCircle
 import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.Explore
+import androidx.compose.material.icons.outlined.PlayCircle
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.Storefront
 import androidx.compose.material3.Icon
@@ -47,9 +49,14 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.sokotz.data.auth.AuthManager
 import com.example.sokotz.data.model.AppLanguage
+import com.example.sokotz.data.repository.AdCampaignRepository
 import com.example.sokotz.data.repository.FirestoreMarketplaceRepository
 import com.example.sokotz.ui.components.SokoTzHeader
 import com.example.sokotz.ui.screens.account.AccountScreen
+import com.example.sokotz.ui.screens.admin.AdminDashboardScreen
+import com.example.sokotz.ui.screens.ads.AdsFeedScreen
+import com.example.sokotz.ui.screens.ads.SavedAdsScreen
+import com.example.sokotz.ui.screens.ads.SellerAdsManagerScreen
 import com.example.sokotz.ui.screens.auth.SignInScreen
 import com.example.sokotz.ui.screens.assistant.AssistantScreen
 import com.example.sokotz.ui.screens.business.BusinessDetailScreen
@@ -70,12 +77,16 @@ import com.example.ui.theme.SokoNeonBlue
 sealed class Screen {
     object Discover : Screen()
     data class Search(val query: String? = null, val categorySlug: String? = null) : Screen()
+    object AdsFeed : Screen()
     object Assistant : Screen()
     object BusinessHub : Screen()
     object Account : Screen()
     object SignIn : Screen()
     data class BusinessDetail(val businessId: String) : Screen()
     data class ListingDetail(val listingId: String) : Screen()
+    object SellerAdsManager : Screen()
+    object AdminDashboard : Screen()
+    object SavedAds : Screen()
 }
 
 enum class BottomNavTab(
@@ -87,7 +98,7 @@ enum class BottomNavTab(
 ) {
     DISCOVER("Gundua", "Discover", Icons.Filled.Explore, Icons.Outlined.Explore, "nav_tab_discover"),
     SEARCH("Tafuta", "Search", Icons.Filled.Search, Icons.Outlined.Search, "nav_tab_search"),
-    ASSISTANT("sokoTZ AI", "sokoTZ AI", Icons.Filled.AutoAwesome, Icons.Outlined.AutoAwesome, "nav_tab_assistant"),
+    ADS("Matangazo", "Ads", Icons.Filled.PlayCircle, Icons.Outlined.PlayCircle, "nav_tab_ads"),
     BUSINESS("Biashara", "Business", Icons.Filled.Storefront, Icons.Outlined.Storefront, "nav_tab_business"),
     ACCOUNT("Akaunti", "Account", Icons.Filled.AccountCircle, Icons.Outlined.AccountCircle, "nav_tab_account")
 }
@@ -99,6 +110,7 @@ fun SokoTzApp() {
     val scope = rememberCoroutineScope()
     val authManager = remember { AuthManager.getInstance(context) }
     val repository = remember { FirestoreMarketplaceRepository.getInstance(context) }
+    val adRepo = remember { AdCampaignRepository.getInstance(context) }
 
     val language by repository.language.collectAsState()
     val currentUser by authManager.currentUser.collectAsState()
@@ -131,8 +143,13 @@ fun SokoTzApp() {
 
     // Back button handling
     BackHandler(enabled = currentScreen !is Screen.Discover) {
-        currentScreen = Screen.Discover
-        selectedTab = BottomNavTab.DISCOVER
+        if (currentScreen is Screen.SellerAdsManager || currentScreen is Screen.AdminDashboard || currentScreen is Screen.SavedAds) {
+            currentScreen = Screen.Account
+            selectedTab = BottomNavTab.ACCOUNT
+        } else {
+            currentScreen = Screen.Discover
+            selectedTab = BottomNavTab.DISCOVER
+        }
     }
 
     if (currentScreen is Screen.SignIn) {
@@ -175,7 +192,7 @@ fun SokoTzApp() {
                         val isSelected = selectedTab == tab && (
                                 (tab == BottomNavTab.DISCOVER && currentScreen is Screen.Discover) ||
                                 (tab == BottomNavTab.SEARCH && currentScreen is Screen.Search) ||
-                                (tab == BottomNavTab.ASSISTANT && currentScreen is Screen.Assistant) ||
+                                (tab == BottomNavTab.ADS && currentScreen is Screen.AdsFeed) ||
                                 (tab == BottomNavTab.BUSINESS && currentScreen is Screen.BusinessHub) ||
                                 (tab == BottomNavTab.ACCOUNT && currentScreen is Screen.Account)
                         )
@@ -187,7 +204,7 @@ fun SokoTzApp() {
                                 currentScreen = when (tab) {
                                     BottomNavTab.DISCOVER -> Screen.Discover
                                     BottomNavTab.SEARCH -> Screen.Search()
-                                    BottomNavTab.ASSISTANT -> Screen.Assistant
+                                    BottomNavTab.ADS -> Screen.AdsFeed
                                     BottomNavTab.BUSINESS -> Screen.BusinessHub
                                     BottomNavTab.ACCOUNT -> Screen.Account
                                 }
@@ -242,7 +259,6 @@ fun SokoTzApp() {
                             currentScreen = Screen.ListingDetail(listingId)
                         },
                         onNavigateToAssistant = {
-                            selectedTab = BottomNavTab.ASSISTANT
                             currentScreen = Screen.Assistant
                         },
                         onNavigateToBusinessHub = {
@@ -277,6 +293,25 @@ fun SokoTzApp() {
                         }
                     )
                 }
+                is Screen.AdsFeed -> {
+                    AdsFeedScreen(
+                        adRepo = adRepo,
+                        language = language,
+                        currentUser = currentUser,
+                        onNavigateToListing = { listingId ->
+                            currentScreen = Screen.ListingDetail(listingId)
+                        },
+                        onNavigateToBusiness = { businessId ->
+                            currentScreen = Screen.BusinessDetail(businessId)
+                        },
+                        onNavigateToCreateCampaign = {
+                            currentScreen = Screen.SellerAdsManager
+                        },
+                        onNavigateToSignIn = {
+                            currentScreen = Screen.SignIn
+                        }
+                    )
+                }
                 is Screen.BusinessHub -> {
                     BusinessHubScreen(
                         repository = repository,
@@ -285,11 +320,13 @@ fun SokoTzApp() {
                             currentScreen = Screen.ListingDetail(listingId)
                         },
                         onNavigateToAssistant = {
-                            selectedTab = BottomNavTab.ASSISTANT
                             currentScreen = Screen.Assistant
                         },
                         onNavigateToSignIn = {
                             currentScreen = Screen.SignIn
+                        },
+                        onNavigateToAdsManager = {
+                            currentScreen = Screen.SellerAdsManager
                         }
                     )
                 }
@@ -300,6 +337,63 @@ fun SokoTzApp() {
                         onNavigateToBusinessHub = {
                             selectedTab = BottomNavTab.BUSINESS
                             currentScreen = Screen.BusinessHub
+                        },
+                        onNavigateToSignIn = {
+                            currentScreen = Screen.SignIn
+                        },
+                        onNavigateToSellerAdsManager = {
+                            currentScreen = Screen.SellerAdsManager
+                        },
+                        onNavigateToSavedAds = {
+                            currentScreen = Screen.SavedAds
+                        },
+                        onNavigateToAdminDashboard = {
+                            currentScreen = Screen.AdminDashboard
+                        }
+                    )
+                }
+                is Screen.SellerAdsManager -> {
+                    SellerAdsManagerScreen(
+                        adRepo = adRepo,
+                        marketplaceRepo = repository,
+                        currentUser = currentUser,
+                        userProfile = userProfile,
+                        language = language,
+                        onBack = {
+                            selectedTab = BottomNavTab.ACCOUNT
+                            currentScreen = Screen.Account
+                        },
+                        onNavigateToSignIn = {
+                            currentScreen = Screen.SignIn
+                        }
+                    )
+                }
+                is Screen.AdminDashboard -> {
+                    AdminDashboardScreen(
+                        adRepo = adRepo,
+                        currentUser = currentUser,
+                        userProfile = userProfile,
+                        language = language,
+                        onBack = {
+                            selectedTab = BottomNavTab.ACCOUNT
+                            currentScreen = Screen.Account
+                        },
+                        onNavigateToListing = { listingId ->
+                            currentScreen = Screen.ListingDetail(listingId)
+                        }
+                    )
+                }
+                is Screen.SavedAds -> {
+                    SavedAdsScreen(
+                        adRepo = adRepo,
+                        currentUser = currentUser,
+                        language = language,
+                        onBack = {
+                            selectedTab = BottomNavTab.ACCOUNT
+                            currentScreen = Screen.Account
+                        },
+                        onNavigateToListing = { listingId ->
+                            currentScreen = Screen.ListingDetail(listingId)
                         },
                         onNavigateToSignIn = {
                             currentScreen = Screen.SignIn

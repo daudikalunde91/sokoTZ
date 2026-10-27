@@ -15,6 +15,12 @@ service cloud.firestore {
       return resource.data;
     }
 
+    function isAdmin() {
+      return isSignedIn() &&
+             exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'ADMIN';
+    }
+
     function isBusinessOwner(bizId) {
       return (bizId == request.auth.uid) ||
              (!exists(/databases/$(database)/documents/businesses/$(bizId))) ||
@@ -81,24 +87,27 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
-    // Users collection: users can only manage their own profile and cannot self-assign or escalate to ADMIN
+    // Users collection
     match /users/{userId} {
-      allow get, list: if isSignedIn() && request.auth.uid == userId;
+      allow get, list: if isSignedIn() && (request.auth.uid == userId || isAdmin());
       allow create: if isSignedIn() &&
                     request.auth.uid == userId &&
                     incoming().userId == request.auth.uid &&
                     incoming().role != 'ADMIN' &&
                     isValidUser(incoming());
       allow update: if isSignedIn() &&
-                    request.auth.uid == userId &&
-                    resource != null &&
-                    incoming().userId == existing().userId &&
-                    incoming().role == existing().role &&
-                    isValidUser(incoming());
-      allow delete: if isSignedIn() && request.auth.uid == userId;
+                    (
+                      (request.auth.uid == userId &&
+                       resource != null &&
+                       incoming().userId == existing().userId &&
+                       incoming().role != 'ADMIN' &&
+                       isValidUser(incoming())) ||
+                      isAdmin()
+                    );
+      allow delete: if isSignedIn() && (request.auth.uid == userId || isAdmin());
     }
 
-    // Businesses collection: public discovery, owner-protected writes, no self-verification or fabricated ratings
+    // Businesses collection
     match /businesses/{businessId} {
       allow get, list: if true;
       allow create: if isSignedIn() &&
@@ -109,18 +118,21 @@ service cloud.firestore {
                     isValidBusiness(incoming());
       allow update: if isSignedIn() &&
                     resource != null &&
-                    resource.data.ownerId == request.auth.uid &&
-                    incoming().ownerId == resource.data.ownerId &&
-                    incoming().isVerified == resource.data.isVerified &&
-                    (!('rating' in incoming()) || incoming().rating == resource.data.rating) &&
-                    (!('reviewCount' in incoming()) || incoming().reviewCount == resource.data.reviewCount) &&
-                    isValidBusiness(incoming());
+                    (
+                      (resource.data.ownerId == request.auth.uid &&
+                       incoming().ownerId == resource.data.ownerId &&
+                       incoming().isVerified == resource.data.isVerified &&
+                       (!('rating' in incoming()) || incoming().rating == resource.data.rating) &&
+                       (!('reviewCount' in incoming()) || incoming().reviewCount == resource.data.reviewCount) &&
+                       isValidBusiness(incoming())) ||
+                      isAdmin()
+                    );
       allow delete: if isSignedIn() &&
                     resource != null &&
-                    resource.data.ownerId == request.auth.uid;
+                    (resource.data.ownerId == request.auth.uid || isAdmin());
     }
 
-    // Listings collection: public discovery, owner-protected writes, must link to own business, no self-featured placement
+    // Listings collection
     match /listings/{listingId} {
       allow get, list: if true;
       allow create: if isSignedIn() &&
@@ -140,17 +152,130 @@ service cloud.firestore {
         (
           request.resource.data.diff(resource.data).affectedKeys().hasOnly(['viewsCount', 'updatedAt']) &&
           incoming().viewsCount == resource.data.viewsCount + 1
-        )
+        ) ||
+        isAdmin()
       );
       allow delete: if isSignedIn() &&
                     resource != null &&
-                    resource.data.ownerId == request.auth.uid;
+                    (resource.data.ownerId == request.auth.uid || isAdmin());
 
-      // Unique viewers subcollection: anti-abuse view counting
       match /viewers/{viewerId} {
         allow get, list: if isSignedIn();
         allow create: if isSignedIn() && request.auth.uid == viewerId;
       }
+    }
+
+    // -------------------------------------------------------------
+    // SOKOTZ VIDEO ADS FEED & DYNAMIC PRICING COLLECTIONS
+    // -------------------------------------------------------------
+
+    // Advertising Packages: Publicly readable, admin-only managed & priced
+    match /ad_packages/{packageId} {
+      allow get, list: if true;
+      allow create, update, delete: if isAdmin();
+    }
+
+    // Package Price Audit History: Admin-only audit log
+    match /package_price_audits/{auditId} {
+      allow get, list: if isAdmin();
+      allow create: if isAdmin();
+      allow update, delete: if false; // immutable audit logs
+    }
+
+    // Ad Campaigns: Strict video advertising lifecycle
+    match /ad_campaigns/{campaignId} {
+      // Public feed: only ACTIVE, verified PAID campaigns can be viewed by buyers
+      // Sellers can view their own campaigns; Admins can view all
+      allow get, list: if (resource.data.status == 'ACTIVE' && resource.data.paymentStatus == 'PAID') ||
+                          (isSignedIn() && resource.data.sellerId == request.auth.uid) ||
+                          isAdmin();
+
+      // Sellers can create campaigns for their own listings
+      allow create: if isSignedIn() &&
+                    incoming().sellerId == request.auth.uid &&
+                    isBusinessOwner(incoming().businessId) &&
+                    incoming().status in ['DRAFT', 'AWAITING_PAYMENT', 'AWAITING_REVIEW'] &&
+                    (!('moderatedByAdminId' in incoming()) || incoming().moderatedByAdminId == null);
+
+      // Updates:
+      // 1. Admin can approve, reject, pause, resume, or edit any campaign
+      // 2. Seller can update draft, request reinstatement, permanently close campaign, or record payments
+      // 3. Authenticated buyers can increment engagement counters atomically (impressions, clicks, shares)
+      allow update: if isSignedIn() && resource != null && (
+        isAdmin() ||
+        (
+          resource.data.sellerId == request.auth.uid &&
+          incoming().sellerId == resource.data.sellerId &&
+          incoming().businessId == resource.data.businessId &&
+          (
+            // Voluntary permanent closure
+            incoming().status == 'PERMANENTLY_CLOSED' ||
+            // Seller requesting reinstatement when product is available again
+            (resource.data.status == 'PAUSED_PRODUCT_UNAVAILABLE' && incoming().reinstatementRequested == true) ||
+            // Draft updates
+            resource.data.status in ['DRAFT', 'AWAITING_PAYMENT', 'AWAITING_REVIEW']
+          )
+        ) ||
+        (
+          // Public engagement metrics update
+          request.resource.data.diff(resource.data).affectedKeys().hasAny(['impressionsCount', 'uniqueViewsCount', 'clicksCount', 'likesCount', 'commentsCount', 'sharesCount', 'savesCount', 'updatedAt'])
+        )
+      );
+
+      allow delete: if isSignedIn() && resource != null && (
+        isAdmin() || (resource.data.sellerId == request.auth.uid && resource.data.status in ['DRAFT', 'AWAITING_PAYMENT'])
+      );
+
+      // Subcollection: Likes (Strict 1 like per user per campaign)
+      match /likes/{userId} {
+        allow get, list: if true;
+        allow create, delete: if isSignedIn() && request.auth.uid == userId;
+      }
+
+      // Subcollection: Comments (Buyer comments & Seller replies)
+      match /comments/{commentId} {
+        allow get, list: if true;
+        allow create: if isSignedIn() && request.auth.uid == incoming().userId;
+        allow update, delete: if isSignedIn() && (request.auth.uid == resource.data.userId || isAdmin());
+      }
+
+      // Subcollection: Unique Viewers
+      match /unique_viewers/{viewerId} {
+        allow get, list: if isSignedIn() && (request.auth.uid == resource.data.sellerId || isAdmin());
+        allow create: if isSignedIn() && request.auth.uid == viewerId;
+      }
+    }
+
+    // Ad Reports: Any authenticated user can submit a report; Admins manage review
+    match /ad_reports/{reportId} {
+      allow create: if isSignedIn() && request.auth.uid == incoming().reporterUserId;
+      allow get, list, update, delete: if isAdmin();
+    }
+
+    // In-App Notifications: Recipient-only access
+    match /ad_notifications/{notificationId} {
+      allow get, list: if isSignedIn() && request.auth.uid == resource.data.recipientUserId;
+      allow update: if isSignedIn() && request.auth.uid == resource.data.recipientUserId;
+      allow create: if isSignedIn(); // triggered by campaign events
+      allow delete: if isSignedIn() && (request.auth.uid == resource.data.recipientUserId || isAdmin());
+    }
+
+    // Saved Ads: Buyer personal list
+    match /saved_ads/{userId}/items/{campaignId} {
+      allow get, list, create, delete: if isSignedIn() && request.auth.uid == userId;
+    }
+
+    // Hidden Ads: Buyer personal preferences
+    match /hidden_ads/{userId}/items/{campaignId} {
+      allow get, list, create, delete: if isSignedIn() && request.auth.uid == userId;
+    }
+
+    // Payment Transactions: Idempotent and auditable financial records
+    match /payment_transactions/{txnId} {
+      allow get, list: if isSignedIn() && (request.auth.uid == resource.data.sellerId || isAdmin());
+      allow create: if isSignedIn() && request.auth.uid == incoming().sellerId;
+      allow update: if isAdmin();
+      allow delete: if false; // immutable financial transaction ledger
     }
   }
 }

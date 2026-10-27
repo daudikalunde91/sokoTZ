@@ -28,8 +28,11 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountCircle
+import androidx.compose.material.icons.filled.AdminPanelSettings
 import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.CameraAlt
+import androidx.compose.material.icons.filled.Campaign
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.CloudDone
 import androidx.compose.material.icons.filled.DarkMode
@@ -107,6 +110,9 @@ fun AccountScreen(
     repository: FirestoreMarketplaceRepository,
     onNavigateToBusinessHub: () -> Unit,
     onNavigateToSignIn: () -> Unit = {},
+    onNavigateToSellerAdsManager: () -> Unit = {},
+    onNavigateToSavedAds: () -> Unit = {},
+    onNavigateToAdminDashboard: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -455,6 +461,32 @@ fun AccountScreen(
                 subtitle = language.displayName,
                 icon = Icons.Default.Language,
                 onClick = { repository.toggleLanguage() }
+            )
+
+            // Admin Portal Link (Visible only to authorized Admins)
+            if (userProfile?.role == "ADMIN") {
+                AccountSettingItem(
+                    title = if (isSw) "Dashibodi ya Msimamizi (Admin)" else "Admin Operations Portal",
+                    subtitle = if (isSw) "Ukaguzi wa kampeni, ripoti, na usimamizi wa bei" else "Review campaigns, reports, and pricing",
+                    icon = Icons.Default.AdminPanelSettings,
+                    onClick = onNavigateToAdminDashboard
+                )
+            }
+
+            // Video Ads Campaign Manager
+            AccountSettingItem(
+                title = if (isSw) "Kampeni Zangu za Video (Ads Feed)" else "My Video Ad Campaigns",
+                subtitle = if (isSw) "Dhibiti na fuatilia matangazo yako ya video ya sokoTZ" else "Manage and track your video ads",
+                icon = Icons.Default.Campaign,
+                onClick = onNavigateToSellerAdsManager
+            )
+
+            // Saved Video Ads
+            AccountSettingItem(
+                title = if (isSw) "Matangazo Yaliyohifadhiwa" else "Saved Video Ads",
+                subtitle = if (isSw) "Tazama video na ofa ulizozihifadhi" else "View saved ads and bookmarked offers",
+                icon = Icons.Default.Bookmark,
+                onClick = onNavigateToSavedAds
             )
 
             // Seller Hub Link

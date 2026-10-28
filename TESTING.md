@@ -17,7 +17,7 @@ SokoTZ enforces role-based access control, business ownership verification, list
 node --test firestore.test.js
 ```
 
-**Test Coverage (8/8 Passing):**
+**Test Coverage (15/15 Passing):**
 1. `Unauthenticated user: cannot read users, but can read businesses and listings` (Public Guest Discovery)
 2. `Authenticated user: Alice can create and read her own user document`
 3. `Authenticated user: Alice cannot write Bob's user document` (User Isolation)
@@ -26,11 +26,22 @@ node --test firestore.test.js
 6. `Security: User cannot self-assign or escalate role to ADMIN` (Privilege Escalation Prevention)
 7. `Security: Business owner cannot self-verify business` (Authoritative Verification Protection)
 8. `Security: Listing cannot be created under another user's business or self-featured` (Relationship & Placement Integrity)
+9. `Security (Criteria 2): Missing business document explicitly denies listing and campaign creation`
+10. `Security (Criteria 3): Listing moderation - owner cannot bypass review to PUBLISHED`
+11. `Security (Criteria 3): Viewer can only increment listing viewsCount +1 without altering other fields`
+12. `Security (Criteria 4): Advertising engagement counters cannot alter sensitive business fields`
+13. `Security (Criteria 5): Payment transactions cannot be verified by client and are immutable`
+14. `Security (Criteria 5): Unvalidated notification creation for arbitrary users is denied`
+15. `Security (Criteria 8): Admin operations are authorized for genuine admins only`
 
 ### B. Android JVM & Robolectric Unit Tests
 ```bash
 gradle :app:testDebugUnitTest
 ```
+**Coverage (10/10 Passing):**
+- `ExampleRobolectricTest`: Database ID configuration, Google Sign-In web client ID generation, Product vs Service model distinction, Gemini multi-turn format, app name string.
+- `MarketplaceRepositoryRuleTest`: Business registration, listing under owned business, nonexistent business rejection, unauthenticated rejection.
+- `ExampleUnitTest`: Basic logic sanity.
 
 ---
 

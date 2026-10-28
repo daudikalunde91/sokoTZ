@@ -1,0 +1,545 @@
+# MASTER PROMPT: SokoTZ FULL SECURITY AUDIT, BUG FIXES & PRODUCTION READINESS
+
+## 1. ROLE AND MISSION
+
+Act as a Senior Android Engineer, Firebase Security Engineer, Backend Engineer, Payment Integration Specialist, QA Engineer, and Application Security Auditor.
+
+Your mission is to audit, repair, test, and harden the existing SokoTZ Android application and its Firebase infrastructure.
+
+**GitHub repository:** https://github.com/daudikalunde91/sokoTZ.git
+
+The project currently contains an Android application primarily built with Kotlin, Jetpack Compose, Firebase Authentication, Cloud Firestore, and related Android technologies.
+
+Do not assume this description is completely accurate. Inspect the current repository and identify its actual architecture, dependencies, Firebase configuration, source files, and implemented features before making changes.
+
+The previous audit identified potentially critical issues involving Firestore authorization, payment verification, campaign pricing, product ownership, ad lifecycle management, notifications, comments, reporting, and analytics. Verify every finding against the current code before changing it.
+
+Your goal is to make SokoTZ secure, reliable, maintainable, and ready for controlled production deployment.
+
+## 2. NON-NEGOTIABLE WORKING RULES
+
+1. Inspect the current repository and Git history before editing anything.
+2. Preserve existing marketplace features, user accounts, business listings, navigation, UI design, and working Firebase integrations.
+3. Do not rebuild the application from scratch unless the existing architecture makes a specific component impossible to repair. Explain and justify any necessary migration.
+4. Do not remove working functionality merely to make tests pass.
+5. Never claim that code, builds, tests, Firebase deployment, payments, or notifications succeeded unless the corresponding operation was actually executed and its result verified.
+6. Never implement simulated production payments, fake payment verification, fabricated success messages, or placeholder security.
+7. Never place service-account private keys, payment secrets, private API credentials, or privileged Firebase credentials in Android client code, source control, or downloadable application assets.
+8. Use server-side authorization for privileged operations. Android UI restrictions are not security controls.
+9. Do not deploy Firestore rules, Cloud Functions, database migrations, payment integrations, or destructive changes to production without explicit authorization.
+10. Do not overwrite existing user data or remove existing collections without a documented migration plan and backup strategy.
+11. Inspect the current code before deciding which files to change. Do not blindly apply old line numbers or assumptions from a previous audit.
+12. Make actual code changes where repository access permits. Do not stop after writing a report or suggesting code snippets.
+13. If a required external service, credential, payment-provider account, or Firebase permission is unavailable, implement the safe portions, clearly document the blocker, and provide the exact configuration steps needed.
+14. If the task exceeds one execution session, maintain a remediation checklist and continue from the last verified checkpoint.
+15. Do not mark a finding as fixed simply because a new function, screen, model, or rules file was created. Verify the complete end-to-end behavior.
+
+## 3. PHASE ZERO: REPOSITORY DISCOVERY AND BASELINE
+
+Before editing:
+
+- Inspect the complete repository structure.
+- Review the latest commits and identify recent changes.
+- Inspect `firestore.rules`, Firebase configuration, Firestore indexes, `firebase.json`, existing tests, Gradle files, Android manifests, repositories, models, ViewModels, screens, and navigation.
+- Search for all code paths that create or modify campaigns, payment transactions, packages, comments, reports, notifications, listings, and analytics.
+- Determine whether Firebase Cloud Functions or another trusted backend already exists.
+- Determine whether Firebase Storage, Firebase Cloud Messaging, a video-upload pipeline, and a real payment provider are configured.
+- Inspect all authorization rules and their interactions with existing user and business roles.
+- Identify the actual Firebase SDK versions and use compatible APIs.
+- Establish the baseline build and test results before modifying code.
+
+Produce a concise baseline report containing:
+- Confirmed vulnerabilities.
+- Unverified previous findings.
+- Existing working features.
+- Missing infrastructure.
+- Proposed files and components to change.
+- Risks and backward-compatibility considerations.
+
+Then proceed with implementation without unnecessarily waiting for confirmation, except when a production action, destructive migration, real financial transaction, or missing external authorization requires explicit approval.
+
+## 4. CRITICAL: FIRESTORE SECURITY RULES
+
+Perform a complete security review of `firestore.rules` and all collections involved in advertising and marketplace operations.
+
+### 4.1 Campaign updates
+
+Eliminate any rule that allows a user to modify protected campaign fields merely by including an allowed analytics field in the same update.
+
+For example, an update involving `impressionsCount` must not permit simultaneous changes to `status`, `paymentStatus`, `sellerId`, `videoUrl`, `listingId`, `packageId`, `priceTzs`, `startDate`, or `endDate`.
+
+Use strict field allowlists, role checks, immutable ownership fields, and validated state transitions.
+
+Prefer server-authoritative campaign metrics. Clients must not be allowed to set arbitrary impressions, unique views, payment states, approval states, or campaign lifecycle timestamps.
+
+Ensure that:
+- Buyers cannot modify campaigns they do not own.
+- Sellers can edit only permitted fields in permitted states.
+- Sellers cannot approve their own campaigns.
+- Sellers cannot activate unpaid campaigns.
+- Users cannot transfer campaign ownership.
+- Administrators are authorized using a trusted, server-managed role or custom claim.
+- Ordinary users cannot assign themselves administrative privileges.
+
+### 4.2 Business and listing ownership
+
+Review `isBusinessOwner()` and every related ownership helper.
+
+Never treat a missing business document as proof of ownership.
+
+When creating or submitting a campaign, verify on a trusted backend that:
+- The authenticated user owns the business or listing.
+- The listing exists.
+- The listing is associated with the correct seller.
+- The listing is eligible for advertising.
+- The submitted listing snapshot cannot override authoritative listing data.
+- The listing is not deleted, suspended, prohibited, or otherwise ineligible.
+
+Validate ownership again when the campaign is approved and activated.
+
+### 4.3 Roles and user profiles
+
+Prevent users from changing their own role to `BUSINESS_OWNER`, `ADMIN`, or another privileged role through profile updates.
+
+Enforce role assignment through trusted server-side workflows. Preserve legitimate user-profile editing without permitting privilege escalation.
+
+Review all other rules for:
+- Unauthorized reads and writes.
+- Missing-document edge cases.
+- Field-type validation.
+- Field allowlists.
+- Ownership validation.
+- Cross-user access.
+- Role escalation.
+- Abuse through malformed or oversized requests.
+
+### 4.4 Privacy
+
+Review `/listings/{id}/viewers` and all viewer, analytics, and notification collections.
+
+Do not expose identifiable viewer records to arbitrary authenticated users. Restrict access to authorized owners, authorized administrators, and explicitly permitted interactions.
+
+Use the minimum personal information necessary.
+
+### 4.5 Security rules tests
+
+Create or expand Firebase Emulator tests for:
+- Unauthenticated access.
+- Buyer access.
+- Seller access.
+- Another seller's campaign.
+- Missing business documents.
+- Forged listing ownership.
+- Attempted role escalation.
+- Combined analytics and protected-field updates.
+- Unauthorized payment-state changes.
+- Unauthorized campaign activation.
+- Notification spoofing.
+- Comment moderation tampering.
+- Viewer privacy.
+- Valid permitted operations.
+
+Run the tests and report actual results.
+
+## 5. TRUSTED BACKEND AND CAMPAIGN STATE MACHINE
+
+Use an existing trusted backend if one exists. Otherwise, evaluate Firebase Cloud Functions with a supported runtime and the project's existing Firebase configuration.
+
+Do not move privileged logic into Android code.
+
+Implement a validated campaign state machine. Adapt it to the existing model where possible, but distinguish at least these concepts:
+
+- Draft.
+- Awaiting payment.
+- Payment pending verification.
+- Awaiting admin review.
+- Rejected.
+- Scheduled or active.
+- Paused due to listing unavailability.
+- Expired or completed.
+- Voluntarily closed.
+- Refund or credit processing, where applicable.
+
+Define permitted transitions and enforce them server-side.
+
+A seller must not directly set `ACTIVE`, `APPROVED`, `PAID`, or `VERIFIED`.
+
+Use transactions, idempotency keys, and concurrency-safe operations to prevent duplicate approvals, double activation, duplicate refunds, repeated notifications, and inconsistent campaign states.
+
+Keep an audit trail of privileged actions without storing unnecessary sensitive payment data.
+
+## 6. REAL PAYMENT VERIFICATION
+
+Remove any production path in which the Android client creates a random reference and directly marks a payment `VERIFIED` or a campaign `PAID`.
+
+Implement a provider-neutral payment architecture, then integrate only payment providers for which credentials, documentation, and merchant authorization are actually available.
+
+Requirements:
+
+1. The server creates a payment intent or transaction record using the authoritative current package price.
+2. Every payment has a unique server-generated reference.
+3. The server stores the expected amount, currency, package, campaign, seller, provider, and transaction status.
+4. The provider's trusted callback, webhook, or server-to-server verification confirms the transaction.
+5. Validate callback authenticity using the provider's documented security mechanism.
+6. Verify reference, amount, currency, recipient, and transaction status.
+7. Reject duplicate, replayed, mismatched, cancelled, and failed transactions.
+8. Make callbacks idempotent.
+9. Never accept a client-submitted screenshot, reference string, or status field as proof of payment.
+10. Keep secrets exclusively in an appropriate server-side secret store.
+11. Do not log full payment credentials or sensitive financial data.
+12. Support pending, successful, failed, cancelled, and reconciliation states.
+13. Activate no campaign until payment is confirmed and the required admin approval is complete.
+14. Ensure the client cannot bypass payment verification by directly writing to Firestore.
+
+Do not invent provider API endpoints or claim a provider is integrated without testing against its real documentation and a suitable sandbox.
+
+If provider credentials are unavailable, implement the secure payment abstraction and pending-verification workflow, document the required credentials, and leave production activation disabled until verification is configured.
+
+## 7. ADMIN-CONTROLLED ADVERTISING PACKAGE PRICING
+
+The administrator must control advertising package prices through the existing admin dashboard.
+
+Requirements:
+
+- Remove hardcoded example prices as the authoritative source of current pricing.
+- Do not use model defaults such as `priceTzs = 2000` as a fallback production price.
+- Do not automatically seed arbitrary prices into production when the package collection is empty.
+- Store package price, duration, active status, display order, and relevant constraints in an authoritative database location.
+- Validate all price changes server-side.
+- Restrict package creation, updates, activation, and deactivation to authorized administrators.
+- Validate package IDs, duration, currency, amount range, and data types.
+- Store a price snapshot on the payment transaction at purchase time.
+- Prevent a seller from submitting a client-modified package price.
+- Define explicitly how a price change affects existing pending transactions and already-paid campaigns.
+- Use integer amounts in Tanzanian shillings where appropriate, with overflow and invalid-value checks.
+- Add audit records for administrator price changes, including previous value, new value, administrator identity, and timestamp.
+- Do not silently swallow audit-write failures. Use a reliable transactional or auditable workflow.
+- Show clear loading, empty, error, and success states in the admin UI.
+- Provide a safe setup path for the initial production package configuration.
+
+Changing a displayed price must not be sufficient to alter the amount accepted by the backend or payment provider.
+
+## 8. PRODUCT AVAILABILITY AND CAMPAIGN LIFECYCLE
+
+Audit `checkProductAvailabilityAndPauseIfNeeded()` and all lifecycle-related code.
+
+Implement authoritative lifecycle handling on the server.
+
+### When a listing becomes unavailable
+
+- Detect listing deletion, deactivation, suspension, or other relevant availability changes.
+- Pause the campaign and remove it from the active feed.
+- Record the exact pause time and reason.
+- Stop campaign-duration consumption while paused, according to the documented policy.
+- Notify the seller.
+- Require a seller reinstatement request.
+- Have an authorized administrator verify that the listing is available and eligible again.
+- Resume only after the required checks pass.
+
+### Seven-day reinstatement deadline
+
+- Track the deadline using server timestamps.
+- Send appropriate reminders through configured notification channels.
+- Close or otherwise resolve the campaign when the deadline passes, according to a documented policy.
+- Ensure the deadline can be processed reliably even if the seller is offline.
+- Use scheduled server-side processing, not an Android timer.
+
+### Campaign duration
+
+Preserve the remaining paid duration when a campaign is paused and resumed. Do not automatically grant a new full package duration after reinstatement unless an explicitly documented policy authorizes it.
+
+Handle:
+- Time zones.
+- Expired campaigns.
+- Missing timestamps.
+- Duplicate scheduler execution.
+- Clock manipulation.
+- Repeated pause/resume events.
+- Simultaneous listing and campaign updates.
+
+### Voluntary closure and refunds
+
+Once a seller voluntarily closes a campaign, treat it as permanently closed if that is the agreed product policy.
+
+Do not silently delete payment history.
+
+Implement documented, auditable refund or SokoTZ balance-credit workflows. Never claim that a refund occurred until the provider confirms it.
+
+## 9. VIDEO UPLOAD, STORAGE, AND PLAYBACK
+
+Inspect the current campaign creation screen. If it accepts arbitrary manually entered video URLs or a demonstration video as production campaign content, replace that workflow with a proper upload process.
+
+Requirements:
+
+- Integrate Firebase Storage or the project's approved media-storage service.
+- Upload videos through authenticated workflows.
+- Use controlled storage paths and ownership checks.
+- Validate file size, supported formats, duration, MIME type, and upload completion.
+- Never trust a filename or MIME type supplied by the client alone.
+- Use secure download access appropriate to the application's privacy model.
+- Prevent users from attaching arbitrary external videos to another seller's product.
+- Link every campaign to an existing eligible product or service owned by the authenticated seller.
+- Store media metadata and processing status.
+- Handle cancellation, retries, upload failure, deletion, and orphaned files.
+- Provide progress indicators and actionable error messages.
+- Ensure videos are reviewed before becoming publicly available.
+- Use adaptive streaming or appropriate adaptive video delivery when supported by the existing infrastructure.
+- Support loading, buffering, playback errors, and reasonable data-usage controls.
+- Do not expose private storage objects or privileged storage credentials.
+
+Do not claim adaptive streaming exists simply because a player can play a video URL. Implement or document the media-processing infrastructure needed for actual adaptive delivery.
+
+## 10. NOTIFICATIONS AND FIREBASE CLOUD MESSAGING
+
+Audit `AdInAppNotificationsSheet.kt`, notification models, Firestore rules, dependencies, and backend infrastructure.
+
+### In-app notifications
+
+- Restrict notification creation to trusted backend workflows.
+- A normal user must not be able to create a notification for an arbitrary recipient.
+- Prevent a recipient from changing notification ownership, content, sender identity, or security-sensitive fields.
+- Allow only explicitly permitted actions such as marking a notification as read.
+- Validate notification types and payloads.
+- Avoid sending secrets or unnecessary personal information in notifications.
+
+### Push notifications
+
+If Firebase Cloud Messaging is not already configured, implement the necessary Android and backend components where access permits.
+
+Include:
+- Correct Firebase Messaging dependency compatible with the project.
+- Device token registration and refresh.
+- Authenticated token ownership.
+- Secure token removal at logout or account removal where appropriate.
+- Server-side notification sending.
+- User permission handling and notification preferences.
+- Deep links to the relevant campaign, report, payment, or listing.
+- Retry and failure handling.
+- Deduplication for retried background events.
+
+Never send FCM messages using server credentials from the Android client.
+
+If Firebase project configuration is incomplete, list the exact console and deployment steps required.
+
+## 11. COMMENTS, SELLER REPLIES, REPORTS, AND MODERATION
+
+Audit the existing comment and reporting workflows.
+
+### Comments
+
+- Validate authenticated authorship.
+- Prevent clients from forging usernames, roles, seller identities, or moderation flags.
+- Enforce sensible content-length limits and field schemas.
+- Prevent comment authors from changing moderation status or ownership.
+- Validate seller replies against the seller who owns the advertised listing or campaign.
+- Restrict edit/delete operations to authorized actors and permitted states.
+- Apply server-side filtering or access control so hidden or removed comments cannot be retrieved through direct unauthorized queries.
+- Preserve legitimate public seller replies and user interactions.
+
+### Reporting
+
+Implement reporting for both ads and individual comments.
+
+Reports must include a validated target, reason, reporter identity, timestamp, status, and only the necessary contextual data.
+
+Prevent duplicate abuse where appropriate, without preventing legitimate follow-up reports.
+
+### Moderation
+
+- Restrict moderation actions to authorized administrators.
+- Add a report queue with priority based on credible fraud, scams, safety threats, prohibited products, and other documented severity criteria.
+- Validate moderation decisions on the backend.
+- Keep an audit trail of moderator actions.
+- Support dismissal/no-action outcomes as well as content removal or other allowed actions.
+- Notify relevant users where appropriate without revealing private reporter details unnecessarily.
+
+The UI must reflect the server's authoritative moderation state.
+
+## 12. ANALYTICS, VIEW COUNTS, AND PRIVACY
+
+Review all client-side writes to impressions, unique views, clicks, likes, shares, comments, and saves.
+
+- Move sensitive counters and unique-view recording to trusted backend logic where feasible.
+- Prevent clients from setting arbitrary counter values.
+- Deduplicate impressions using an explicit and documented rule.
+- Define what qualifies as an impression or unique view.
+- Protect against repeated requests, abuse, and straightforward counter inflation.
+- Use server timestamps.
+- Make analytics updates concurrency-safe.
+- Preserve aggregate campaign reporting.
+- Expose identifiable viewer information only for explicitly permitted interactions and authorized purposes.
+- Do not expose lists of people who merely watched an advertisement to arbitrary sellers or buyers.
+- Respect the user's account-specific hide and save behavior.
+- Ensure analytics failures do not incorrectly charge users or corrupt campaign payment states.
+
+Document known limitations against sophisticated bots or abuse if full fraud prevention is outside the project's current infrastructure.
+
+## 13. FEED ELIGIBILITY AND FAIR RANKING
+
+Review `AdsFeedScreen.kt` and all ad-selection logic.
+
+Only show campaigns that meet all authoritative eligibility conditions:
+
+- Payment verified by the backend.
+- Admin approval complete.
+- Campaign active.
+- Campaign within its valid scheduled period.
+- Listing exists and is eligible.
+- Listing belongs to the expected seller.
+- Campaign is not paused, closed, suspended, or removed.
+- Media is valid and approved.
+
+Do not rely only on client-side filters to protect access to ineligible campaigns.
+
+Implement or clearly isolate a ranking strategy combining:
+- Relevant buyer interests where consent and available data permit.
+- Fair exposure rotation among eligible sellers.
+- Appropriate recency and relevance.
+- Frequency limits where practical.
+- Account-specific hidden ads.
+- Deduplication and exclusion of ineligible campaigns.
+
+Avoid a ranking system that systematically excludes new or smaller sellers.
+
+Do not invent buyer interests or collect unnecessary personal data. Provide reasonable fallbacks when interest data is unavailable.
+
+## 14. OTHER SECURITY AND DATA-INTEGRITY FINDINGS
+
+Inspect and address all of the following if still present:
+
+- Business creation rules that allow an impossible or manipulated rating state.
+- Weak `ad_reports` validation.
+- Client-controlled notification creation.
+- Broad comment updates that permit moderation tampering.
+- Missing listing-to-campaign ownership checks.
+- Missing or ineffective server-side campaign expiration.
+- Client-controlled financial and lifecycle fields.
+- Unrestricted access to viewer information.
+- Missing Firestore indexes required by production queries.
+- Missing Storage security rules.
+- Inadequate error handling and silent exception swallowing.
+- Duplicate navigation entries or regressions introduced during fixes.
+- Test documentation that claims success without corresponding execution evidence.
+
+Maintain compatibility with existing legitimate user and business data.
+
+## 15. AUTOMATED TESTING AND BUILD VALIDATION
+
+Add or update tests appropriate to the actual architecture.
+
+At minimum, test:
+
+1. Firestore authorization and privilege escalation.
+2. Campaign state transitions.
+3. Payment verification and duplicate callbacks.
+4. Server-authoritative package prices.
+5. Listing ownership and availability.
+6. Pause/resume and the seven-day deadline.
+7. Campaign expiration.
+8. Comment creation, replies, and moderation.
+9. Notification recipient restrictions.
+10. Analytics deduplication and access restrictions.
+11. Video upload validation and ownership.
+12. Existing authentication and marketplace behavior.
+13. Relevant UI loading, empty, success, and error states.
+
+Use Firebase Emulator Suite tests for security rules and backend behavior where appropriate.
+
+Run available commands for:
+- Android compilation.
+- Unit tests.
+- Instrumentation tests where the environment supports them.
+- Firebase rules tests.
+- Backend tests.
+- Static analysis and lint.
+- Dependency and secret scanning where available.
+
+Do not change tests merely to make incorrect behavior appear correct.
+
+For each test suite, report:
+- Exact command executed.
+- Passed and failed test counts.
+- Relevant failure messages.
+- Whether it actually ran or was blocked by environment, credentials, network, or missing configuration.
+
+Do not report an unexecuted test as passed.
+
+## 16. IMPLEMENTATION AND DELIVERY
+
+Work in logical stages, committing coherent changes where Git access is available.
+
+Suggested stages:
+
+A. Firestore and Storage security.
+B. Trusted backend and campaign state machine.
+C. Payment verification and dynamic package pricing.
+D. Product availability and campaign lifecycle.
+E. Video upload and playback.
+F. Notifications and FCM.
+G. Comments, reports, and moderation.
+H. Analytics, ranking, and privacy.
+I. Regression testing and deployment documentation.
+
+After each stage:
+- Summarize the code changed.
+- Explain the vulnerability or defect addressed.
+- Run the relevant tests.
+- Report remaining blockers.
+- Preserve the existing working application.
+
+Create or update:
+- `AUDIT_REPORT.md`
+- `TESTING.md`
+- `CHANGELOG.md`
+- Backend deployment instructions.
+- Firebase rules and Storage rules deployment instructions.
+- Payment provider configuration instructions.
+- Required environment-variable documentation using placeholders only.
+- A production-readiness checklist.
+- A rollback and data-migration plan where applicable.
+
+Do not place real secrets in documentation.
+
+## 17. FINAL ACCEPTANCE CRITERIA
+
+Do not declare SokoTZ production-ready until evidence confirms that:
+
+- A normal user cannot grant themselves a privileged role.
+- A seller cannot modify another seller's campaigns.
+- A client cannot mark a payment verified.
+- An unverified payment cannot activate a campaign.
+- A seller cannot override the admin's package price.
+- Campaigns cannot be activated without a valid owned listing and required approval.
+- Expired or paused campaigns cannot continue appearing as eligible ads.
+- Campaign duration is preserved correctly during permitted pauses.
+- Users cannot forge notifications or moderation decisions.
+- Unauthorized users cannot access private viewer records.
+- Media uploads enforce ownership and validation.
+- Critical rules and backend tests pass.
+- The Android app builds successfully in the tested environment.
+- Required production services and credentials are explicitly configured.
+- Deployment steps and known limitations are documented.
+
+If any acceptance criterion cannot be verified, mark it **NOT VERIFIED** or **BLOCKED**. Do not conceal it or declare full production readiness.
+
+## 18. FINAL RESPONSE FORMAT
+
+At completion, provide:
+
+1. Executive summary.
+2. Files created, modified, and deleted.
+3. Critical vulnerabilities fixed.
+4. Payment and pricing status.
+5. Campaign lifecycle status.
+6. Video and notification status.
+7. Comment moderation and analytics status.
+8. Test commands and actual results.
+9. Remaining blockers and required external credentials.
+10. Exact manual steps the repository owner must complete.
+11. Deployment and rollback instructions.
+12. Final classification:
+   - NOT SAFE FOR PRODUCTION
+   - CONDITIONALLY READY FOR STAGING
+   - READY FOR PRODUCTION, WITH EVIDENCE
+
+Be precise, security-focused, and honest. Prioritize verified security and financial correctness over cosmetic changes. Preserve the existing SokoTZ application and its legitimate data.
